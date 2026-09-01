@@ -8,23 +8,31 @@ same workload, so they are directly comparable.
 - **Workload:** identical prompt, exactly 128 new tokens per request, greedy decoding
 - **Date:** 2026-09-01
 
-## Throughput: HuggingFace vs vLLM vs SGLang
+## Throughput: HuggingFace vs vLLM vs SGLang vs TensorRT-LLM
 
 Total tokens per second across all concurrent requests.
 
-| batch | HF `generate()` | vLLM 0.27.1 | SGLang 0.5.18 | SGLang, default graph range |
+| batch | HF `generate()` | vLLM 0.27.1 | SGLang 0.5.18 | TensorRT-LLM 1.2.1 |
 |---:|---:|---:|---:|---:|
-| 1 | 165 | 726 | 701 | 700 |
-| 2 | 321 | 1,310 | 971 | 1,026 |
-| 4 | 639 | 2,698 | 2,772 | 2,541 |
-| 8 | 1,275 | 5,155 | 4,977 | 4,992 |
-| 16 | 2,548 | 9,880 | 9,625 | 9,680 |
-| 32 | 4,964 | 19,889 | 18,491 | 5,657 *(eager)* |
-| 64 | 9,782 | 37,265 | 32,523 | 11,152 *(eager)* |
+| 1 | 165 | 726 | 701 | 613 |
+| 2 | 321 | 1,310 | 971 | 1,095 |
+| 4 | 639 | 2,698 | 2,772 | 2,018 |
+| 8 | 1,275 | 5,155 | 4,977 | 3,674 |
+| 16 | 2,548 | 9,880 | 9,625 | 5,446 |
+| 32 | 4,964 | 19,889 | 18,491 | 7,352 |
+| 64 | 9,782 | 37,265 | 32,523 | 9,251 |
 
-vLLM ran natively; SGLang ran in the `lmsysorg/sglang:latest` container, because this
-machine has no CUDA toolkit (see the SGLang section below). The last column is SGLang at
-its stock settings, kept deliberately, and explained under "the cliff".
+vLLM ran natively. SGLang and TensorRT-LLM ran in their official containers, because
+neither could serve from a pip install on this machine (see below).
+
+**Read the TensorRT-LLM column with care, and do not conclude that it is the slow engine.**
+It was run at stock settings on a consumer Blackwell card with a 0.5 B model, which is not
+the hardware or the workload it is built for, and no attempt was made to tune it. Its curve
+flattens above batch 8 for a reason this exercise did not identify. Enabling CUDA graphs
+explicitly (`CudaGraphConfig(max_batch_size=64, enable_padding=True)`) changed nothing:
+613 against 660 tok/s at batch 1, and 9,251 against 9,025 at batch 64, which is noise. The
+cause is still open. A tuned TensorRT-LLM deployment on a datacenter GPU is a different
+measurement, and this number says nothing about it.
 
 ### What the numbers say
 
@@ -54,8 +62,9 @@ the economic argument for continuous batching, measured.
 
 ### The cliff: a default that costs half your throughput
 
-The last column is the same SGLang with nothing configured. It tracks vLLM to batch 16 and
-then collapses: 5,657 tok/s at batch 32 against 18,491 once configured.
+`results_sglang_defaultgraphs.json` holds the same SGLang run with nothing configured. It
+tracks vLLM to batch 16 and then collapses: 5,657 tok/s at batch 32 against 18,491 once
+configured, and 11,152 against 32,523 at batch 64.
 
 SGLang captures decode CUDA graphs for a fixed set of batch sizes, and by default that set
 stops at 24:
@@ -124,6 +133,35 @@ any framework's serving logic. Both engines wanted a compiler for FP8 and JIT pa
 fp16 0.5 B benchmark never executes. "Just use vLLM" is one line in a README and rather more
 than one line on a machine that has not been prepared for it, which is the argument for
 running these things in their official containers.
+
+## TensorRT-LLM: pip installs, then cannot import
+
+The pip route reaches further than SGLang's and still fails, for a third distinct reason.
+
+- The PyPI package is a **source tarball only**; the wheels live on `pypi.nvidia.com`.
+- Two installs died fetching `nvidia-cuda-runtime==13.3.29` from that index. It is a plain
+  timeout on a large wheel, not a missing package, and `UV_HTTP_TIMEOUT=600` fixes it.
+- The install then succeeds, and `import tensorrt_llm` fails:
+  `libmpi.so.40: cannot open shared object file`. TensorRT-LLM links against system
+  OpenMPI, which is not installed here and is not pip-installable.
+
+The container has all of it:
+
+```bash
+docker run --gpus all --rm --user "$(id -u):$(id -g)" --shm-size 16g --ipc=host \
+  -e HOME=/tmp -e HF_HOME=/hf \
+  -v ~/.cache/huggingface:/hf -v "$PWD":/bench \
+  nvcr.io/nvidia/tensorrt-llm/release:1.2.1 \
+  python3 /bench/bench_serving.py --backend trtllm --out /bench/results_trtllm.json
+```
+
+`nvcr.io` allows anonymous pulls, so no NGC login is needed. The image is 59 GB.
+
+Two things worth knowing about the modern release. It defaults to a **PyTorch backend**
+(`Using LLM with PyTorch backend`), not the classic ahead-of-time TensorRT engine build, so
+the "you must compile an engine first" description now applies to a path you have to opt
+into rather than to the default entry point. And `CudaGraphConfig.max_batch_size` defaults
+to **0**.
 
 ## Reproducing
 

@@ -86,9 +86,13 @@ def bench_sglang(model_id, batch_sizes, n_tokens, util, attention_backend='auto'
 
 def bench_trtllm(model_id, batch_sizes, n_tokens, util):
     from tensorrt_llm import LLM, SamplingParams
-    from tensorrt_llm.llmapi import KvCacheConfig
+    from tensorrt_llm.llmapi import KvCacheConfig, CudaGraphConfig
+    # CudaGraphConfig.max_batch_size defaults to 0, i.e. no CUDA graphs at all.
+    # Leaving it flattens the throughput curve, the same trap as SGLang's bs=24 cap.
     llm = LLM(model=model_id, dtype='float16',
-              kv_cache_config=KvCacheConfig(free_gpu_memory_fraction=util))
+              kv_cache_config=KvCacheConfig(free_gpu_memory_fraction=util),
+              cuda_graph_config=CudaGraphConfig(max_batch_size=max(batch_sizes),
+                                                enable_padding=True))
     sp = SamplingParams(temperature=0.0, max_tokens=n_tokens, min_tokens=n_tokens)
     llm.generate([PROMPT]*2, sp)                                # warm up / engine build
     rows = []
