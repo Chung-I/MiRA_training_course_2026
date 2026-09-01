@@ -8,46 +8,80 @@ same workload, so they are directly comparable.
 - **Workload:** identical prompt, exactly 128 new tokens per request, greedy decoding
 - **Date:** 2026-09-01
 
-## Throughput: HuggingFace `generate()` vs vLLM
-
-| batch | HF `generate()` | vLLM 0.27.1 | speedup |
-|---:|---:|---:|---:|
-| 1 | 165 | 726 | 4.4x |
-| 2 | 321 | 1,310 | 4.1x |
-| 4 | 639 | 2,698 | 4.2x |
-| 8 | 1,275 | 5,155 | 4.0x |
-| 16 | 2,548 | 9,880 | 3.9x |
-| 32 | 4,964 | 19,889 | 4.0x |
-| 64 | 9,782 | 37,265 | 3.8x |
+## Throughput: HuggingFace vs vLLM vs SGLang
 
 Total tokens per second across all concurrent requests.
 
+| batch | HF `generate()` | vLLM 0.27.1 | SGLang 0.5.18 | SGLang, default graph range |
+|---:|---:|---:|---:|---:|
+| 1 | 165 | 726 | 701 | 700 |
+| 2 | 321 | 1,310 | 971 | 1,026 |
+| 4 | 639 | 2,698 | 2,772 | 2,541 |
+| 8 | 1,275 | 5,155 | 4,977 | 4,992 |
+| 16 | 2,548 | 9,880 | 9,625 | 9,680 |
+| 32 | 4,964 | 19,889 | 18,491 | 5,657 *(eager)* |
+| 64 | 9,782 | 37,265 | 32,523 | 11,152 *(eager)* |
+
+vLLM ran natively; SGLang ran in the `lmsysorg/sglang:latest` container, because this
+machine has no CUDA toolkit (see the SGLang section below). The last column is SGLang at
+its stock settings, kept deliberately, and explained under "the cliff".
+
 ### What the numbers say
 
-**A serving engine is worth about 4x, at every batch size.** The gap is not a batching
-artifact — HuggingFace batches perfectly well, and both scale close to linearly here.
-vLLM is simply about four times faster per token: CUDA graphs instead of per-step Python
-dispatch, a paged KV cache instead of padded contiguous allocation, and fused kernels.
+**A serving engine is worth about 4x, and the two engines are close to each other.** The
+gap over HuggingFace is not a batching artifact: `generate()` batches perfectly well and
+all three scale close to linearly. vLLM and SGLang are simply about four times faster per
+token through CUDA graphs instead of per-step Python dispatch, a paged KV cache instead of
+padded contiguous allocation, and fused kernels. Between the two engines the spread is
+small, and on a 0.5 B model it is mostly dispatch overhead rather than anything
+architectural. Do not read a winner into it.
 
 **Against the bandwidth ceiling.** The notebook predicts a single-stream roof of
-**1,812 tok/s** for this model on this card (1.79 TB/s ÷ 0.92 GB of fp16 weights):
+**1,812 tok/s** for this model on this card (1.79 TB/s / 0.92 GB of fp16 weights):
 
 | | batch-1 tok/s | share of the roof |
 |---|---:|---:|
 | HF `generate()` | 165 | **9%** |
+| SGLang | 701 | **39%** |
 | vLLM | 726 | **40%** |
 
 Same GPU, same model, same tokens. The hardware was never the problem.
 
-**Batching beats the single-stream roof entirely.** vLLM at batch 64 reaches 37,265
-tok/s — about **20x the single-stream ceiling** — because the ceiling is per stream. The
-weights are read once for the whole batch, so every extra concurrent request is nearly
-free. This is the economic argument for continuous batching, measured.
+**Batching beats the single-stream roof entirely.** vLLM at batch 64 reaches 37,265 tok/s,
+about **20x the single-stream ceiling**, because the ceiling is per stream. The weights are
+read once for the whole batch, so every extra concurrent request is nearly free. This is
+the economic argument for continuous batching, measured.
 
-## SGLang: installed, could not serve on this machine
+### The cliff: a default that costs half your throughput
 
-SGLang 0.5.9 installs cleanly (11 GB, torch 2.9.1+cu128). It cannot serve here, and the
-reason is worth more than the missing table row.
+The last column is the same SGLang with nothing configured. It tracks vLLM to batch 16 and
+then collapses: 5,657 tok/s at batch 32 against 18,491 once configured.
+
+SGLang captures decode CUDA graphs for a fixed set of batch sizes, and by default that set
+stops at 24:
+
+```
+Capturing batches (bs=1 2 4 8 12 16 24)
+```
+
+Any batch beyond 24 finds no graph and falls back to eager execution, which is most of the
+4x. Raising `cuda_graph_max_bs_decode` to 64 extends the capture set to
+`1 2 4 8 12 16 24 32 40 48 56 64` and the cliff disappears.
+
+Two things worth taking from this:
+
+1. **Benchmark at the concurrency you will actually serve.** Had this been measured only up
+   to batch 16, the default would have looked fine. Had it been measured only at 32 and 64,
+   SGLang would have looked like the slower engine. Neither reading is true.
+2. **A wrong number is more dangerous than a crash.** The missing CUDA toolkit announced
+   itself with a stack trace. This one produced a plausible, quotable, and completely
+   misleading throughput curve.
+
+## SGLang: the pip install cannot serve here, the container can
+
+SGLang 0.5.9 installs cleanly from pip (11 GB, torch 2.9.1+cu128) and then cannot serve on
+this machine. Running the official container instead worked on the first attempt, which is
+why there are SGLang numbers above.
 
 **This machine has no CUDA toolkit.** SGLang JIT-compiles attention kernels for the exact
 architecture it finds (`sm_120a`) at startup, through FlashInfer, which shells out to
@@ -58,21 +92,38 @@ only moves the error from an assertion to an honest `nvcc: not found`.
 Switching to `attention_backend="triton"` gets past FlashInfer but fails the same way during
 CUDA graph capture (`ninja exited with status 127`).
 
-**Why there is no number here.** The remaining option is `disable_cuda_graph=True`. That
-would produce a figure, but SGLang without CUDA graphs against vLLM with them is not a
-comparison, it is a misattribution, and a reader would take it as evidence that SGLang is
-slower. A missing row is more honest than a misleading one.
+**There is no pip wheel that fixes this.** `nvidia-cuda-nvcc-cu12` ships exactly one
+binary, `ptxas`, at every 12.x version, and `cuda-toolkit[all]==12.8.2` only depends on that
+same wheel. The package that does ship a real `nvcc` is `nvidia-cuda-nvcc`, which exists
+only for 13.x, and SGLang 0.5.9 pins torch cu128.
 
-**The real fix**, for whoever picks this up: install a CUDA toolkit (`apt install
-nvidia-cuda-toolkit`, needs root, or `conda install -c nvidia cuda-nvcc` matching the
-venv's torch CUDA version), or run SGLang's official Docker image, which ships one.
+**The fix used here: the official container**, which ships a complete CUDA toolkit.
 
-### The pattern across all three
+```bash
+docker run --gpus all --rm --user "$(id -u):$(id -g)" --shm-size 16g \
+  -e HOME=/tmp -e HF_HOME=/hf \
+  -v ~/.cache/huggingface:/hf -v "$PWD":/bench \
+  lmsysorg/sglang:latest \
+  python3 /bench/bench_serving.py --backend sglang --out /bench/results_sglang.json
+```
 
-Every failure in this exercise was CUDA toolchain plumbing. None was about models, GPUs,
-or any framework's serving logic. Both engines demanded a compiler for FP8 and JIT paths
-that an fp16 0.5B benchmark never executes. "Just use vLLM" is one line in a README and
-rather more than one line on a machine that has not been prepared for it.
+It worked first try. The image also carries a newer stack than pip resolved locally,
+SGLang 0.5.18 on torch 2.13+cu130. Running as your own UID with `HOME` and `HF_HOME`
+pointed at mounts keeps the output file writable and reuses the existing model cache.
+
+The alternative, if you want to stay native, is a CUDA 12.8 toolkit installed into your home
+directory with NVIDIA's runfile (`--toolkit --toolkitpath=$HOME/cuda-12.8`, no root needed),
+which would also fix vLLM's DeepGEMM path. Do not use `apt install nvidia-cuda-toolkit`: the
+Ubuntu candidate is CUDA 12.0, and a 12.0 compiler against 12.8 headers reproduces the same
+CCCL version assert that broke vLLM.
+
+### The pattern
+
+Every environment failure here was CUDA toolchain plumbing. None was about models, GPUs, or
+any framework's serving logic. Both engines wanted a compiler for FP8 and JIT paths that an
+fp16 0.5 B benchmark never executes. "Just use vLLM" is one line in a README and rather more
+than one line on a machine that has not been prepared for it, which is the argument for
+running these things in their official containers.
 
 ## Reproducing
 

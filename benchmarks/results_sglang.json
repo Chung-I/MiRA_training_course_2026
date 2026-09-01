@@ -1,0 +1,51 @@
+{
+  "backend": "sglang",
+  "model": "Qwen/Qwen2.5-0.5B-Instruct",
+  "tokens": 128,
+  "rows": [
+    {
+      "batch": 1,
+      "seconds": 0.18269675597548485,
+      "total_tok_s": 700.6145200365554,
+      "per_user_tok_s": 700.6145200365554
+    },
+    {
+      "batch": 2,
+      "seconds": 0.2635710060130805,
+      "total_tok_s": 971.2752698879757,
+      "per_user_tok_s": 485.63763494398785
+    },
+    {
+      "batch": 4,
+      "seconds": 0.18468703888356686,
+      "total_tok_s": 2772.2573446141105,
+      "per_user_tok_s": 693.0643361535276
+    },
+    {
+      "batch": 8,
+      "seconds": 0.20574837201274931,
+      "total_tok_s": 4976.953110163842,
+      "per_user_tok_s": 622.1191387704803
+    },
+    {
+      "batch": 16,
+      "seconds": 0.21277497010305524,
+      "total_tok_s": 9625.19228181808,
+      "per_user_tok_s": 601.57451761363
+    },
+    {
+      "batch": 32,
+      "seconds": 0.221513528842479,
+      "total_tok_s": 18490.969925871734,
+      "per_user_tok_s": 577.8428101834917
+    },
+    {
+      "batch": 64,
+      "seconds": 0.2518831850029528,
+      "total_tok_s": 32523.012601670755,
+      "per_user_tok_s": 508.17207190110554
+    }
+  ],
+  "wall_seconds": 50.448224782943726,
+  "gpu": "NVIDIA GeForce RTX 5090"
+}

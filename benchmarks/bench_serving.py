@@ -55,12 +55,19 @@ def bench_vllm(model_id, batch_sizes, n_tokens, util):
     return rows
 
 
-def bench_sglang(model_id, batch_sizes, n_tokens, util, attention_backend='triton'):
+def bench_sglang(model_id, batch_sizes, n_tokens, util, attention_backend='auto'):
     import sglang as sgl
-    # 'triton' avoids FlashInfer's nvcc-based JIT, which needs a full CUDA toolkit.
+    # 'auto' lets SGLang pick its own default (FlashInfer), which is the fair
+    # comparison against vLLM. Only force 'triton' where no CUDA toolkit exists,
+    # since FlashInfer JIT-compiles kernels with nvcc at startup.
+    kw = {} if attention_backend == 'auto' else {'attention_backend': attention_backend}
+    # SGLang captures decode CUDA graphs only up to bs=24 by default, so batches
+    # above that silently fall back to eager and the throughput curve collapses.
+    # Raise the cap to the largest batch measured, otherwise the comparison is
+    # graphs-vs-no-graphs rather than framework-vs-framework.
     llm = sgl.Engine(model_path=model_id, dtype='float16',
                      mem_fraction_static=util, context_length=2048,
-                     attention_backend=attention_backend)
+                     cuda_graph_max_bs_decode=max(batch_sizes), **kw)
     sp = {'temperature': 0.0, 'max_new_tokens': n_tokens,
           'min_new_tokens': n_tokens, 'ignore_eos': True}
     llm.generate([PROMPT]*2, sp)                                # warm up
@@ -103,7 +110,7 @@ if __name__ == '__main__':
     ap.add_argument('--batch-sizes', default='1,2,4,8,16,32,64')
     ap.add_argument('--tokens', type=int, default=128)
     ap.add_argument('--gpu-util', type=float, default=0.45)
-    ap.add_argument('--attention-backend', default='triton')
+    ap.add_argument('--attention-backend', default='auto')
     ap.add_argument('--out', default=None)
     a = ap.parse_args()
     bs_list = [int(x) for x in a.batch_sizes.split(',')]
