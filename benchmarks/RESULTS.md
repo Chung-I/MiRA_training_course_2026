@@ -26,13 +26,10 @@ vLLM ran natively. SGLang and TensorRT-LLM ran in their official containers, bec
 neither could serve from a pip install on this machine (see below).
 
 **Read the TensorRT-LLM column with care, and do not conclude that it is the slow engine.**
-It was run at stock settings on a consumer Blackwell card with a 0.5 B model, which is not
-the hardware or the workload it is built for, and no attempt was made to tune it. Its curve
-flattens above batch 8 for a reason this exercise did not identify. Enabling CUDA graphs
-explicitly (`CudaGraphConfig(max_batch_size=64, enable_padding=True)`) changed nothing:
-613 against 660 tok/s at batch 1, and 9,251 against 9,025 at batch 64, which is noise. The
-cause is still open. A tuned TensorRT-LLM deployment on a datacenter GPU is a different
-measurement, and this number says nothing about it.
+It ran on a consumer Blackwell card with a 0.5 B model, which is neither the hardware nor
+the workload it is built for. Five configurations were tried and none of them changed the
+curve; see "tuning TensorRT-LLM" below. A tuned deployment on a datacenter GPU is a
+different measurement and this number says nothing about it.
 
 ### What the numbers say
 
@@ -162,6 +159,48 @@ Two things worth knowing about the modern release. It defaults to a **PyTorch ba
 the "you must compile an engine first" description now applies to a path you have to opt
 into rather than to the default entry point. And `CudaGraphConfig.max_batch_size` defaults
 to **0**.
+
+## Tuning TensorRT-LLM: five configurations, no change
+
+The flat curve above batch 8 was worth chasing, so the resolved runtime config was dumped
+rather than guessed at (`trtllm_config_sweep.py`, results in `results_trtllm_sweep.json`).
+
+**What the defaults actually are.** Three plausible explanations died immediately:
+
+| setting | resolved value |
+|---|---|
+| `max_batch_size` | 2048, so nothing was queueing |
+| `cuda_graph_config` | `batch_sizes=[1..32, 64, 128]`, already enabled |
+| `disable_overlap_scheduler` | False, the overlap scheduler was already on |
+| `max_num_tokens` | 8192 |
+| `attn_backend` | TRTLLM |
+| `enable_chunked_prefill` | False |
+
+CUDA graphs being on by default explains why passing `CudaGraphConfig` explicitly changed
+nothing earlier. That hypothesis is dead, and this is the evidence.
+
+**The sweep.** Tokens/sec, total across concurrent requests:
+
+| config | batch 16 | batch 64 | vs baseline at 64 |
+|---|---:|---:|---:|
+| baseline | 5,374 | 9,291 | 100% |
+| FlashInfer attention | 4,726 | 8,597 | 93% |
+| `max_num_tokens=32768` | 5,359 | 9,318 | 100% |
+| chunked prefill + 32k tokens | 5,517 | 9,071 | 98% |
+| KV fraction 0.7 + 32k tokens | 5,337 | 9,271 | 100% |
+
+Everything lands within a few percent of baseline, and switching to FlashInfer attention is
+actively worse. The baseline also reproduced the standalone run to within 1% (5,374 against
+5,411, 9,291 against 9,251), so the flat curve is a stable property of this setup rather
+than noise.
+
+**Conclusion: no accessible knob fixes it here.** What remains is the part that cannot be
+configured away, that a 0.5 B model generating 128 tokens is dominated by per-request
+overhead rather than by the GEMMs and attention kernels TensorRT-LLM optimizes. It is built
+for large models on datacenter GPUs, and this benchmark is the opposite of that on both
+axes. The honest reading is not "TensorRT-LLM is slow" but "this is the wrong measurement
+to judge TensorRT-LLM by", which is itself the useful lesson: a benchmark outside a tool's
+design envelope measures the envelope, not the tool.
 
 ## Reproducing
 
