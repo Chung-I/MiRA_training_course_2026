@@ -1,0 +1,943 @@
+% =====================================================================
+%  Graph Neural Networks --- MiRA Training Course 2026
+%  Speaker: 仲翊 | 9/3, 17:20-17:50, R546 | 30 minutes
+%
+%  COMPILE (XeTeX-based engine required: the deck uses fontspec + a CJK font)
+%      tectonic gnn_talk.tex            <- verified working
+%      xelatex gnn_talk.tex             (twice, if tectonic is unavailable)
+%      ./compile.sh gnn_talk.tex
+%
+%  SPEAKER NOTES: uncomment the \setbeameroption line below to print them.
+% =====================================================================
+\documentclass[aspectratio=169,11pt]{beamer}
+
+% ---- theme -----------------------------------------------------------
+\usetheme{metropolis}
+\metroset{progressbar=frametitle, sectionpage=none, numbering=none}
+
+% ---- fonts (XeLaTeX/LuaLaTeX + fontspec; CJK for the speaker's name) --
+\usepackage{fontspec}
+\newfontfamily\cjkfont{Noto Sans CJK TC}[Scale=MatchLowercase]
+\newcommand{\CJK}[1]{{\cjkfont #1}}
+% If "Noto Sans CJK TC" is missing on the build machine, swap the family
+% above for any installed CJK face (e.g. "Noto Sans CJK SC", "WenQuanYi Zen Hei").
+
+% ---- packages --------------------------------------------------------
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{amsmath, amssymb}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, calc, backgrounds, fit}
+\usepackage{listings}
+\usepackage{xcolor}
+
+% ---- colours ---------------------------------------------------------
+\definecolor{acc}{HTML}{C0392B}      % accent: the piece under discussion
+\definecolor{acc2}{HTML}{2C7BB6}     % secondary accent
+\definecolor{dim}{HTML}{AAAAAA}      % greyed-out
+\definecolor{good}{HTML}{1B7837}
+\setbeamercolor{alerted text}{fg=acc}
+
+% ---- code listings ---------------------------------------------------
+\lstset{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{acc2}\bfseries,
+  commentstyle=\color{dim}\itshape,
+  stringstyle=\color{good},
+  language=Python,
+  showstringspaces=false,
+  columns=fullflexible,
+  breaklines=true,
+  frame=none,
+  aboveskip=0.4em, belowskip=0.4em,
+}
+
+% ---- speaker notes ---------------------------------------------------
+% \setbeameroption{show notes}                    % <- uncomment to print notes
+% \setbeameroption{show notes on second screen=right}
+
+% ---- shorthands ------------------------------------------------------
+\newcommand{\arx}[1]{{\scriptsize\color{dim}arXiv:#1}}
+\newcommand{\hv}{h_v}
+\newcommand{\hu}{h_u}
+\newcommand{\Nv}{\mathcal{N}(v)}
+
+% =====================================================================
+\title{Graph Neural Networks}
+\subtitle{Every node updates itself by summarizing its neighbors}
+\author{\CJK{仲翊}}
+\date{MiRA Training Course 2026 \quad$\cdot$\quad 9/3, R546}
+% =====================================================================
+
+\begin{document}
+
+% --- 1 -----------------------------------------------------------------
+\begin{frame}[plain]
+  \titlepage
+\end{frame}
+\note{Last talk of an 8.5-hour day. Say the time promise immediately -- do not
+warm up. Target: finish at 17:48.
+
+CHECKPOINT: 17:20 here.}
+
+% --- 2 -----------------------------------------------------------------
+\begin{frame}{30 minutes, 3 ideas, and I stop at 17:50}
+  \begin{enumerate}
+    \setlength{\itemsep}{1.1em}
+    \item Every node updates itself by \alert{summarizing its neighbors}.
+    \item \alert{Layers are hops.} Two or three is usually the right number.
+    \item The hard part is never the layer. It is deciding \alert{what the
+          nodes and the edges are}.
+  \end{enumerate}
+  \vfill
+  \begin{center}
+    \small\color{dim}No derivations. One equation. No spectral graph theory.
+  \end{center}
+\end{frame}
+\note{Say the promise out loud: "30 minutes, 3 ideas, I stop at 17:50."
+Then actually stop early -- they will remember it.
+
+Do NOT define a graph yet. Four robot pictures first.}
+
+% --- 3 -----------------------------------------------------------------
+\begin{frame}{Eight arms in one workspace, planned by a network}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      \vspace{0.5em}
+      \textbf{RoboBallet} plans reaching motions for up to \alert{8 arms and
+      40 tasks} sharing one workspace --- with a GNN plus RL, no per-scene
+      re-planning.
+      \vspace{0.8em}
+
+      Nodes: arms, tasks, obstacles.\\
+      Edges: \alert{who can collide with whom}.
+      \vfill
+      \arx{2509.05397}
+    \end{column}
+    \begin{column}{0.44\textwidth}
+      \centering
+      \begin{tikzpicture}[scale=0.82, every node/.style={transform shape}]
+        \tikzset{
+          arm/.style={circle, draw=acc2, fill=acc2!15, minimum size=6.5mm,
+                      font=\tiny\bfseries, inner sep=0pt},
+          tsk/.style={rectangle, rounded corners=1pt, draw=dim, fill=black!4,
+                      minimum size=5mm, font=\tiny, inner sep=1pt},
+          col/.style={draw=acc, dashed, thick, opacity=0.75}
+        }
+        \node[arm] (a1) at (-1.5, 1.1) {A1};
+        \node[arm] (a2) at ( 1.5, 1.1) {A2};
+        \node[arm] (a3) at (-1.5,-1.1) {A3};
+        \node[arm] (a4) at ( 1.5,-1.1) {A4};
+        \node[tsk] (t1) at (0, 1.5) {t};
+        \node[tsk] (t2) at (0,-1.5) {t};
+        \node[tsk] (t3) at (0, 0.0) {t};
+        \draw[col] (a1)--(a2); \draw[col] (a3)--(a4);
+        \draw[col] (a1)--(a3); \draw[col] (a2)--(a4);
+        \draw[col] (a1)--(a4);
+        \draw[dim] (a1)--(t1); \draw[dim] (a2)--(t1);
+        \draw[dim] (a3)--(t2); \draw[dim] (a4)--(t2);
+        \draw[dim] (a1)--(t3); \draw[dim] (a4)--(t3);
+      \end{tikzpicture}
+
+      {\scriptsize\color{dim}dashed = possible collision}
+    \end{column}
+  \end{columns}
+\end{frame}
+\note{One sentence, then move. The applications are the hook; the math is the
+payoff. Do not explain the architecture yet -- that is the reveal on slide 7.}
+
+% --- 4 -----------------------------------------------------------------
+\begin{frame}{A robot that pours and folds by predicting particles}
+  \vspace{0.5em}
+  \textbf{DPI-Net} learns the dynamics of rigid bodies, deformable objects
+  \alert{and fluids} from particles --- then uses that model to manipulate them.
+  \vspace{1.0em}
+
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      Nodes: \alert{particles} of the object.\\[0.4em]
+      Edges: \alert{contacts} (and rigid-group links).
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      There is no mesh, no state vector, no fixed object count. Water is 3000
+      particles today and 5000 tomorrow, and the same network runs.
+    \end{column}
+  \end{columns}
+  \vfill
+  \arx{1810.01566}
+\end{frame}
+\note{The "variable number of things" point is being planted here quietly --
+it pays off on the flattening-fails slide.}
+
+% --- 5 -----------------------------------------------------------------
+\begin{frame}{A physics engine nobody wrote}
+  \vspace{0.5em}
+  \textbf{GNS} and \textbf{MeshGraphNets} simulate sand, water and cloth by
+  \alert{message passing on the mesh} --- learned from data, not written down
+  as equations.
+  \vspace{1.0em}
+
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      Nodes: particles, or mesh vertices.\\[0.4em]
+      Edges: within a contact radius; mesh edges.
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      They \alert{generalize to more particles than they were trained on}.
+      Keep that fact --- we come back to why.
+    \end{column}
+  \end{columns}
+  \vfill
+  \arx{2002.09405} \hfill \arx{2010.03409}
+\end{frame}
+\note{Flag the generalization fact now, cash it in on the multi-robot /
+invariance slide. Do not explain it yet.}
+
+% --- 6 -----------------------------------------------------------------
+\begin{frame}{A map a planner can reason over}
+  \vspace{0.4em}
+  \textbf{3D Dynamic Scene Graphs} turn a metric map into a graph of
+  \alert{places, objects and humans} --- something a planner can query, not
+  just a point cloud.
+  \vspace{0.6em}
+
+  \begin{center}
+    \begin{tikzpicture}[scale=0.9, every node/.style={transform shape},
+      lvl/.style={rectangle, rounded corners=2pt, draw=acc2, fill=acc2!10,
+                  minimum width=22mm, minimum height=6mm, font=\scriptsize},
+      lk/.style={-{Latex[length=1.6mm]}, dim}]
+      \node[lvl] (b) at (0,0)    {objects, humans};
+      \node[lvl] (p) at (0,1.0)  {places};
+      \node[lvl] (r) at (0,2.0)  {rooms};
+      \node[lvl] (f) at (0,3.0)  {building};
+      \draw[lk] (b)--(p); \draw[lk] (p)--(r); \draw[lk] (r)--(f);
+      \node[right=6mm of b, font=\scriptsize, color=dim, align=left]
+        {containment, adjacency,\\ ``the mug is on the table''};
+      \node[right=6mm of r, font=\scriptsize, color=dim, align=left]
+        {a hierarchy, so a planner can\\ reason at the right scale};
+    \end{tikzpicture}
+  \end{center}
+  \vfill
+  \arx{2002.06289}
+\end{frame}
+\note{Fourth and last application. Next slide is the reveal -- pause before it.
+
+CHECKPOINT: 17:24 by the end of this slide.}
+
+% --- 7 -----------------------------------------------------------------
+\begin{frame}{All four are the same architecture}
+  \vspace{0.6em}
+  \begin{center}
+    \Large
+    Eight arms. Fluid particles. A cloth mesh. A building.\\[1.0em]
+    \alert{One layer type, repeated.}
+  \end{center}
+  \vfill
+  \begin{center}
+    \normalsize\color{dim}
+    Nothing above is a grid. Nothing above is a sequence.
+  \end{center}
+\end{frame}
+\note{Pause here. Let it land before the wake-up question.}
+
+% --- 8 -----------------------------------------------------------------
+\begin{frame}{What does a CNN assume? What does a Transformer assume?}
+  \vspace{1.0em}
+  \begin{center}\Large Hands up. Shout it out.\end{center}
+  \vspace{1.0em}
+  \begin{columns}[T]
+    \begin{column}{0.45\textwidth}
+      \centering
+      \onslide<2->{\textbf{CNN} $\rightarrow$ a \alert{grid}\\
+      {\small neighbors are the pixels next to you}}
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \centering
+      \onslide<3->{\textbf{Transformer} $\rightarrow$ an \alert{ordered sequence}\\
+      {\small positions 1, 2, 3, \dots}}
+    \end{column}
+  \end{columns}
+  \vfill
+  \onslide<4->{\begin{center}\large
+    None of the four things I just showed you is either one.
+  \end{center}}
+\end{frame}
+\note{This is the wake-up. Ask it, wait, take answers from the room. Costs 45
+seconds and buys you the next 25 minutes of attention.
+
+If nobody answers, answer it yourself cheerfully and move on -- do not let
+silence stretch.}
+
+% --- 9 -----------------------------------------------------------------
+\begin{frame}{Flattening fails: relabel the nodes and the answer changes}
+  \vspace{0.4em}
+  Six objects on a table. Flatten them into one vector, feed an MLP.
+  \vspace{0.8em}
+
+  \begin{center}
+    \begin{tikzpicture}[scale=0.95, every node/.style={transform shape},
+      box/.style={rectangle, draw=dim, minimum width=7mm, minimum height=7mm,
+                  font=\scriptsize}]
+      \foreach \i/\lab in {0/1,1/2,2/3,3/4,4/5,5/6}
+        \node[box] at (\i*0.78, 0.9) {\lab};
+      \node[font=\scriptsize, color=dim] at (-1.15,0.9) {order A};
+      \foreach \i/\lab in {0/4,1/1,2/6,3/2,4/5,5/3}
+        \node[box, fill=acc!10, draw=acc] at (\i*0.78, 0) {\lab};
+      \node[font=\scriptsize, color=acc] at (-1.15,0) {order B};
+      \node[align=left, font=\small, anchor=west] at (5.1,0.45)
+        {\alert{Same scene.} Different vector.\\ Different answer.};
+    \end{tikzpicture}
+  \end{center}
+  \vspace{0.6em}
+  The MLP has to learn $n!$ copies of the same function. A GNN gets this
+  \alert{for free} --- summing over neighbors does not care about order.
+\end{frame}
+\note{Demo 1 in the notebook shows this numerically. If the room is dead at
+this point, switch to Colab NOW and run Demo 1 instead of talking -- the
+MLP output visibly changes when the nodes are renumbered.}
+
+% --- 10 ----------------------------------------------------------------
+\begin{frame}{Flattening fails: 8 objects today, 15 tomorrow}
+  \vspace{1.2em}
+  \begin{center}
+    \Large
+    A fixed input dimension cannot take a \alert{variable number of things}.
+  \end{center}
+  \vspace{1.4em}
+  \begin{itemize}
+    \setlength{\itemsep}{0.7em}
+    \item 8 objects on the table today, 15 tomorrow.
+    \item 3000 fluid particles in training, 5000 at test time.
+    \item 4 robots in the lab, 9 at the demo.
+  \end{itemize}
+  \vfill
+  \begin{center}\small\color{dim}
+    Padding and truncating is not a fix, it is a bug you have not hit yet.
+  \end{center}
+\end{frame}
+\note{Fast slide. 40 seconds. The audience already believes this one.}
+
+% --- 11 ----------------------------------------------------------------
+\begin{frame}{``Isn't attention already a graph?'' --- yes, a fully-connected one}
+  \vspace{0.8em}
+  \begin{center}\large
+    A Transformer \alert{is} a GNN on a complete graph,\\
+    with attention as the aggregation.
+  \end{center}
+  \vspace{1.2em}
+  \begin{center}
+    \begin{tikzpicture}[scale=0.85, every node/.style={transform shape},
+      n/.style={circle, draw=acc2, fill=acc2!15, minimum size=5mm, inner sep=0pt}]
+      \begin{scope}
+        \foreach \i in {0,...,5} \node[n] (a\i) at (\i*60:1.1) {};
+        \foreach \i/\j in {0/1,0/2,0/3,0/4,0/5,1/2,1/3,1/4,1/5,
+                           2/3,2/4,2/5,3/4,3/5,4/5}
+          \draw[dim, opacity=0.6] (a\i)--(a\j);
+        \node at (0,-1.75) {\small Transformer: \emph{learn} the edges};
+      \end{scope}
+      \begin{scope}[xshift=6cm]
+        \foreach \i in {0,...,5} \node[n] (b\i) at (\i*60:1.1) {};
+        \foreach \i/\j in {0/1,1/2,2/3,3/4,4/5,5/0,0/3}
+          \draw[acc, thick] (b\i)--(b\j);
+        \node at (0,-1.75) {\small GNN: you \emph{already know} the edges};
+      \end{scope}
+    \end{tikzpicture}
+  \end{center}
+  \vfill
+  \begin{center}
+    Which particles touch, which arms can collide --- \alert{don't spend data
+    and compute learning what you already know}.
+  \end{center}
+\end{frame}
+\note{Pre-empt the smartest question in the room by asking it yourself. This
+buys you enormous credibility and it removes the one objection that would
+otherwise sit in someone's head for 20 minutes.
+
+CHECKPOINT: 17:28 by the end of this slide. Movement 3 starts now.}
+
+% --- 12 ----------------------------------------------------------------
+\begin{frame}{One idea: summarize your neighbors, then repeat}
+  \vspace{-0.4em}
+  \begin{center}
+    \begin{tikzpicture}[scale=0.92, every node/.style={transform shape},
+      nb/.style={circle, draw=acc2, fill=acc2!15, minimum size=8mm,
+                 font=\small, inner sep=0pt},
+      me/.style={circle, draw=acc, very thick, fill=acc!12, minimum size=10mm,
+                 font=\small, inner sep=0pt},
+      msg/.style={-{Latex[length=2mm]}, acc2, thick}]
+
+      \node[me] (v) at (0,0) {$\hv$};
+      \node[nb] (u1) at (150:2.3) {$h_{u_1}$};
+      \node[nb] (u2) at ( 90:2.3) {$h_{u_2}$};
+      \node[nb] (u3) at ( 30:2.3) {$h_{u_3}$};
+      \node[nb] (u4) at (270:2.3) {$h_{u_4}$};
+
+      \foreach \u in {u1,u2,u3,u4} \draw[msg] (\u) -- (v);
+      \node[color=acc2, font=\scriptsize, anchor=north east] at (-0.95,0.32)
+        {message};
+
+      \node<2->[draw=acc, fill=white, rounded corners=2pt, font=\scriptsize,
+            right=3.0cm of v, align=center] (agg)
+        {sum / mean / max\\ \color{dim}(order-independent)};
+      \draw<2->[-{Latex[length=2mm]}, acc, thick] (v) -- (agg);
+
+      \node<3->[draw=good, fill=good!8, rounded corners=2pt, font=\scriptsize,
+            below=0.9cm of agg, align=center] (upd)
+        {small MLP\\ \color{dim}update myself};
+      \draw<3->[-{Latex[length=2mm]}, good, thick] (agg) -- (upd);
+    \end{tikzpicture}
+  \end{center}
+  \vspace{-0.3em}
+  \begin{enumerate}
+    \item<1-> Every neighbor \alert{sends a message}.
+    \item<2-> Combine them with something \alert{order-independent}.
+    \item<3-> \alert{Update myself} with a small MLP. Then repeat $L$ times.
+  \end{enumerate}
+\end{frame}
+\note{Say the sentence before any notation appears. This is the whole talk in
+one picture -- do not rush it, and do not add symbols yet.
+
+If they only remember one slide, it should be this one.}
+
+% --- 13 ----------------------------------------------------------------
+\begin{frame}{The message-passing equation, in three clicks}
+  \vspace{1.6em}
+  \begin{center}
+    \large
+    \only<1>{$\hv \;\leftarrow\; \textcolor{dim}{\mathrm{UPDATE}\Big(\hv,\;
+      \mathrm{AGG}\big\{}\;\textcolor{acc}{\mathrm{MSG}(\hv, \hu, e_{uv})}\;
+      \textcolor{dim}{:\; u \in \Nv \big\}\Big)}$}
+    \only<2>{$\hv \;\leftarrow\; \textcolor{dim}{\mathrm{UPDATE}\Big(\hv,\;}
+      \textcolor{acc}{\mathrm{AGG}\big\{}\;\mathrm{MSG}(\hv, \hu, e_{uv})\;
+      \textcolor{acc}{:\; u \in \Nv \big\}}\textcolor{dim}{\Big)}$}
+    \only<3->{$\hv \;\leftarrow\; \textcolor{acc}{\mathrm{UPDATE}\Big(}\hv
+      \textcolor{acc}{,}\;
+      \mathrm{AGG}\big\{\;\mathrm{MSG}(\hv, \hu, e_{uv})\;:\; u \in \Nv \big\}
+      \textcolor{acc}{\Big)}$}
+  \end{center}
+  \vspace{1.8em}
+  \begin{center}
+    \only<1>{\alert{One neighbor sends a message.} It may use my features, its
+      features, and \emph{what is on the edge between us}.}
+    \only<2>{\alert{Combine all the messages.} Sum, mean or max --- anything that
+      ignores the order. This is where permutation invariance comes from.}
+    \only<3>{\alert{Update myself.} A small MLP on (me, the summary).
+      That is the entire layer.}
+    \only<4>{Stack $L$ of these. \alert{That is a GNN.} There is nothing else.}
+  \end{center}
+  \vspace{1.2em}
+  \onslide<4->{\begin{center}\small\color{dim}
+    GCN in one line: $H \leftarrow \hat{A}\,(H W)$, with
+    $\hat{A} = D^{-1/2}(A+I)D^{-1/2}$ --- a normalized neighbor average, then a
+    linear map.
+  \end{center}}
+\end{frame}
+\note{This is the only equation in the talk. Read it left to right, out loud,
+one click at a time. Point at the coloured piece each time.
+
+Emphasise: $e_{uv}$ is the edge feature -- in robotics that is usually the
+relative pose, and that is a design decision worth more than the architecture.
+
+CHECKPOINT: 17:32 by the end of this slide.}
+
+% --- 14 ----------------------------------------------------------------
+\begin{frame}{$L$ layers $=$ an $L$-hop receptive field}
+  \vspace{0.2em}
+  \begin{center}
+    \begin{tikzpicture}[scale=1.05, every node/.style={transform shape},
+      n/.style={circle, draw=dim, fill=black!3, minimum size=6.5mm, inner sep=0pt},
+      h1/.style={circle, draw=acc2, very thick, fill=acc2!30, minimum size=6.5mm,
+                 inner sep=0pt},
+      h2/.style={circle, draw=good, very thick, fill=good!25, minimum size=6.5mm,
+                 inner sep=0pt},
+      me/.style={circle, draw=acc, very thick, fill=acc!25, minimum size=7.5mm,
+                 inner sep=0pt}]
+
+      \coordinate (cv) at (0,0);
+      \coordinate (ca) at (-1.6, 1.0);  \coordinate (cb) at (1.6, 1.0);
+      \coordinate (cc) at (0,-1.6);
+      \coordinate (cd) at (-3.1, 1.8);  \coordinate (ce) at (-2.7,-0.3);
+      \coordinate (cf) at ( 3.1, 1.8);  \coordinate (cg) at ( 2.7,-0.3);
+      \coordinate (ch) at (-1.4,-2.7);  \coordinate (ci) at ( 1.4,-2.7);
+
+      \foreach \x/\y in {cv/ca, cv/cb, cv/cc, ca/cd, ca/ce, cb/cf, cb/cg,
+                         cc/ch, cc/ci, ce/ch}
+        \draw[dim] (\x) -- (\y);
+
+      % base state: every node grey
+      \foreach \c in {ca,cb,cc,cd,ce,cf,cg,ch,ci} \node[n] at (\c) {};
+      % 1-hop lights up on click 2
+      \node<2->[h1] at (ca) {}; \node<2->[h1] at (cb) {}; \node<2->[h1] at (cc) {};
+      % 2-hop lights up on click 3
+      \node<3->[h2] at (cd) {}; \node<3->[h2] at (ce) {}; \node<3->[h2] at (cf) {};
+      \node<3->[h2] at (cg) {}; \node<3->[h2] at (ch) {}; \node<3->[h2] at (ci) {};
+      \node[me] at (cv) {\tiny $v$};
+
+      \node[font=\small, anchor=west, color=acc]  at (3.9,1.70)
+        {layer 0: just me};
+      \node<2->[font=\small, anchor=west, color=acc2] at (3.9,1.00)
+        {after 1 layer: 1 hop};
+      \node<3->[font=\small, anchor=west, color=good] at (3.9,0.30)
+        {after 2 layers: 2 hops};
+    \end{tikzpicture}
+  \end{center}
+  \vspace{-0.2em}
+  \onslide<4->{\begin{center}\large
+    Same picture as a CNN's receptive field. \alert{Layers are hops.}
+  \end{center}}
+\end{frame}
+\note{Demo 3 in the notebook is exactly this: put a 1 on node 0, propagate,
+watch the non-zero set grow one hop per layer.
+
+The CNN analogy is the payoff -- almost everyone in the room already has the
+CNN receptive-field picture, so hand them the mapping and stop.}
+
+% --- 15 ----------------------------------------------------------------
+\begin{frame}{GCN, GraphSAGE, GAT differ only in the AGG box}
+  \vspace{0.6em}
+  \begin{center}
+  \small
+  \begin{tabular}{@{}lll@{}}
+    \toprule
+    & \textbf{AGG} & \textbf{Use it when} \\
+    \midrule
+    \textbf{GCN}       & normalized mean & always --- this is your baseline \\[0.5em]
+    \textbf{GraphSAGE} & sample neighbors, then mean/max
+                       & the graph is large, or new nodes\\
+                       & & appear at test time \\[0.5em]
+    \textbf{GAT}       & attention-weighted sum
+                       & neighbors should not count equally \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+  \vfill
+  \begin{center}\large
+    Three famous papers. \alert{One box changed.}
+  \end{center}
+\end{frame}
+\note{Say the punchline out loud: they differ only in that one box. This is
+the slide that removes the fear of the literature -- the alphabet soup of GNN
+variants is mostly this single choice.
+
+Do not discuss expressiveness / the WL test. One sentence if asked.}
+
+% --- 16 ----------------------------------------------------------------
+\begin{frame}{Three task types, three readouts}
+  \vspace{0.8em}
+  \begin{itemize}
+    \setlength{\itemsep}{1.1em}
+    \item \textbf{Node-level} --- read off $h_v$.\\
+      {\small Label every point in the cloud. Predict every particle's next position.}
+    \item \textbf{Edge-level} --- read off a function of $(h_u, h_v)$.\\
+      {\small Will this pair collide? Is this a loop closure?}
+    \item \textbf{Graph-level} --- \alert{readout}: sum or mean over all nodes,
+      then an MLP.\\
+      {\small Is this scene graspable? Will this grasp succeed?}
+  \end{itemize}
+  \vfill
+  \begin{center}\small\color{dim}
+    This is the slide that maps \emph{your} problem onto a GNN. Pick your row first.
+  \end{center}
+\end{frame}
+\note{Ask them silently to place their own project in one of the three rows.
+Do not take answers -- no time -- but tell them to do it.}
+
+% --- 17 ----------------------------------------------------------------
+\begin{frame}{You will spend 90\% of your time on graph construction}
+  \vspace{-0.2em}
+  \begin{columns}[T]
+    \begin{column}{0.50\textwidth}
+      \centering
+      \begin{tikzpicture}[scale=0.72, every node/.style={transform shape},
+        pt/.style={circle, fill=acc2, minimum size=1.6mm, inner sep=0pt},
+        ee/.style={dim, line width=0.35pt}]
+        \begin{scope}
+          \node[pt] (p0) at (-0.10,1.85) {};  \node[pt] (p1) at (0.95,1.60) {};
+          \node[pt] (p2) at (1.70,0.80) {};   \node[pt] (p3) at (1.85,-0.30) {};
+          \node[pt] (p4) at (1.20,-1.35) {};  \node[pt] (p5) at (0.10,-1.80) {};
+          \node[pt] (p6) at (-1.05,-1.45) {}; \node[pt] (p7) at (-1.80,-0.55) {};
+          \node[pt] (p8) at (-1.85,0.55) {};  \node[pt] (p9) at (-1.05,1.55) {};
+          \node[pt] (p10) at (0.20,0.25) {};  \node[pt] (p11) at (-0.35,-0.15) {};
+          \node[pt] (p12) at (0.45,-0.35) {}; \node[pt] (p13) at (-0.05,-0.55) {};
+          \draw[ee] (p0)--(p1); \draw[ee] (p0)--(p9); \draw[ee] (p1)--(p2);
+          \draw[ee] (p2)--(p3); \draw[ee] (p3)--(p4); \draw[ee] (p4)--(p5);
+          \draw[ee] (p5)--(p6); \draw[ee] (p6)--(p7); \draw[ee] (p7)--(p8);
+          \draw[ee] (p8)--(p9); \draw[ee] (p10)--(p11); \draw[ee] (p10)--(p12);
+          \draw[ee] (p11)--(p13); \draw[ee] (p12)--(p13);
+          \node at (0,-2.5) {\small $k=3$: \emph{two disconnected pieces}};
+        \end{scope}
+        \begin{scope}[xshift=5.2cm]
+          \node[pt] (q0) at (-0.10,1.85) {};  \node[pt] (q1) at (0.95,1.60) {};
+          \node[pt] (q2) at (1.70,0.80) {};   \node[pt] (q3) at (1.85,-0.30) {};
+          \node[pt] (q4) at (1.20,-1.35) {};  \node[pt] (q5) at (0.10,-1.80) {};
+          \node[pt] (q6) at (-1.05,-1.45) {}; \node[pt] (q7) at (-1.80,-0.55) {};
+          \node[pt] (q8) at (-1.85,0.55) {};  \node[pt] (q9) at (-1.05,1.55) {};
+          \node[pt] (q10) at (0.20,0.25) {};  \node[pt] (q11) at (-0.35,-0.15) {};
+          \node[pt] (q12) at (0.45,-0.35) {}; \node[pt] (q13) at (-0.05,-0.55) {};
+          \draw[ee] (q0)--(q1); \draw[ee] (q0)--(q2); \draw[ee] (q0)--(q9);
+          \draw[ee] (q0)--(q10); \draw[ee] (q0)--(q11); \draw[ee] (q1)--(q2);
+          \draw[ee] (q1)--(q9); \draw[ee] (q1)--(q10); \draw[ee] (q1)--(q12);
+          \draw[ee] (q2)--(q3); \draw[ee] (q2)--(q10); \draw[ee] (q2)--(q12);
+          \draw[ee] (q3)--(q4); \draw[ee] (q3)--(q10); \draw[ee] (q3)--(q12);
+          \draw[ee] (q3)--(q13); \draw[ee] (q4)--(q5); \draw[ee] (q4)--(q10);
+          \draw[ee] (q4)--(q12); \draw[ee] (q4)--(q13); \draw[ee] (q5)--(q6);
+          \draw[ee] (q5)--(q11); \draw[ee] (q5)--(q12); \draw[ee] (q5)--(q13);
+          \draw[ee] (q6)--(q7); \draw[ee] (q6)--(q11); \draw[ee] (q6)--(q12);
+          \draw[ee] (q6)--(q13); \draw[ee] (q7)--(q8); \draw[ee] (q7)--(q10);
+          \draw[ee] (q7)--(q11); \draw[ee] (q7)--(q13); \draw[ee] (q8)--(q9);
+          \draw[ee] (q8)--(q10); \draw[ee] (q8)--(q11); \draw[ee] (q8)--(q13);
+          \draw[ee] (q9)--(q10); \draw[ee] (q9)--(q11); \draw[ee] (q10)--(q11);
+          \draw[ee] (q10)--(q12); \draw[ee] (q10)--(q13); \draw[ee] (q11)--(q12);
+          \draw[ee] (q11)--(q13); \draw[ee] (q12)--(q13);
+          \node at (0,-2.5) {\small $k=20$: \emph{structure thrown away}};
+        \end{scope}
+      \end{tikzpicture}
+    \end{column}
+    \begin{column}{0.46\textwidth}
+      \vspace{0.4em}
+      {\small Same 225 points, three different models:}
+      \vspace{0.4em}
+
+      \centering\small
+      \begin{tabular}{@{}rrr@{}}
+        \toprule
+        $k$ & edges & mean degree \\
+        \midrule
+        3  & 421  & 3.7 \\
+        8  & 1054 & 9.4 \\
+        20 & 2545 & 22.6 \\
+        \bottomrule
+      \end{tabular}
+
+      \vspace{0.9em}
+      \raggedright\small
+      k-NN vs.\ radius vs.\ fully-connected. How many neighbors.
+      \vspace{0.5em}
+
+      And in robotics: put the \alert{relative pose on the edge} --- that buys
+      translation invariance for free, instead of paying for it in training data.
+    \end{column}
+  \end{columns}
+\end{frame}
+\note{Numbers are measured, Demo 5 in the notebook (225 points).
+
+Ask the room: which k is right? There is no answer without the task. Too small
+and the object falls apart into pieces; too large and everything touches
+everything and you have thrown the structure away.
+
+This is the slide that actually saves them time. Say so.
+
+CHECKPOINT: 17:37 by the end of this slide.}
+
+% --- 18 ----------------------------------------------------------------
+\begin{frame}{What the nodes and edges actually were}
+  \vspace{-0.5em}
+  \centering
+  \scriptsize
+  \setlength{\tabcolsep}{4pt}
+  \renewcommand{\arraystretch}{1.0}
+  \begin{tabular}{@{}>{\raggedright\arraybackslash}p{3.15cm}
+                    >{\raggedright\arraybackslash}p{2.50cm}
+                    >{\raggedright\arraybackslash}p{2.95cm}
+                    >{\raggedright\arraybackslash}p{4.10cm}@{}}
+    \toprule
+    \textbf{Application} & \textbf{Nodes} & \textbf{Edges} & \textbf{Paper} \\
+    \midrule
+    Multi-arm motion planning & arms, tasks, obstacles & possible collisions
+      & RoboBallet \arx{2509.05397} \\
+    Deformables and fluids & particles of the object & contact + rigid-group
+      & DPI-Net \arx{1810.01566} \\
+    Learned physics & particles & within a radius
+      & GNS \arx{2002.09405} \\
+    Learned physics (mesh) & mesh vertices & mesh edges
+      & MeshGraphNets \arx{2010.03409} \\
+    Deformables from vision & object keypoints & learned latent graph
+      & \arx{2104.12149} \\
+    Point clouds & points & k-NN, recomputed \emph{in feature space}
+      & DGCNN / EdgeConv \arx{1801.07829} \\
+    Grasp pose detection & points of the cloud & local neighborhoods
+      & Grasp-the-Graph 2.0 \arx{2505.02664} \\
+    Multi-robot planning & robots & communication range (decentralized)
+      & Li \& Prorok \arx{1912.06095} \\
+    Spatial perception & places, objects, agents & containment, adjacency
+      & 3D Dynamic Scene Graphs\newline\arx{2002.06289} \\
+    \bottomrule
+  \end{tabular}
+  \vspace{0.5em}
+
+  \footnotesize
+  \alert{This is the column you copy into your own project.}
+\end{frame}
+\note{Do not read the table. Point at two rows -- the DGCNN one (edges are
+recomputed in feature space, which surprises people) and whichever row is
+closest to the projects in this room.
+
+Tell them the slide will be on the repo, so they stop photographing it.}
+
+% --- 19 ----------------------------------------------------------------
+\begin{frame}{In multi-robot systems, a ``message'' is a real radio message}
+  \vspace{0.8em}
+  \begin{center}\large
+    Nodes are robots. Edges are \alert{who is in communication range}.\\[0.6em]
+    One round of message passing $=$ one round of radio traffic.
+  \end{center}
+  \vspace{1.0em}
+  \begin{itemize}
+    \setlength{\itemsep}{0.8em}
+    \item So the \alert{number of layers is a bandwidth decision}, not a
+      hyperparameter. \arx{1912.06095}
+    \item And in physics and manipulation, the graph gives you the right
+      invariance for free: particles interact \alert{locally and identically},
+      which is exactly what a shared message function assumes.
+    \item That is why learned simulators generalize to \alert{more particles
+      than they were trained on}.
+  \end{itemize}
+\end{frame}
+\note{This is the "the inductive bias matches the physical system" slide --
+the cleanest example in the whole field. Both bullets generalize, so say them
+slowly.
+
+Cash in the promise made on the GNS slide.}
+
+% --- 20 ----------------------------------------------------------------
+\begin{frame}{Deeper is worse: over-smoothing after 3 layers}
+  \vspace{0.2em}
+  \begin{columns}[c]
+    \begin{column}{0.50\textwidth}
+      \centering\small
+      \begin{tabular}{@{}rrr@{}}
+        \toprule
+        layers & test acc. & mean pairwise dist. \\
+        \midrule
+        1 & 71.2\% & \\
+        2 & 91.3\% & \\
+        3 & \textcolor{good}{\textbf{96.9\%}} & \\
+        4 & 96.2\% & \\
+        5 & 96.2\% & 5.6 \\
+        6 & \textcolor{acc}{\textbf{54.4\%}} & \textcolor{acc}{\textbf{0.10}} \\
+        7 & 56.2\% & \\
+        8 & 48.8\% & \\
+        \bottomrule
+      \end{tabular}
+    \end{column}
+    \begin{column}{0.46\textwidth}
+      \footnotesize
+      After enough rounds of averaging with your neighbors, \alert{every node
+      in a connected graph holds the same vector}. That is over-smoothing, and
+      it is a property of the averaging, not of the task.
+      \vspace{0.5em}
+
+      \textbf{Two honest caveats:}
+      \begin{itemize}\setlength{\itemsep}{0.3em}
+        \item The cliff mixes over-smoothing with the plain difficulty of
+          \alert{training deep GCNs} without residual connections.
+        \item This is a toy task with a \emph{global} label, so extra hops keep
+          helping longer than usual. On real benchmarks the optimum is
+          \alert{2--3 layers}.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \vspace{0.4em}
+  \begin{center}\large
+    The rule survives either explanation: \alert{start at 2}.
+  \end{center}
+\end{frame}
+\note{Numbers measured, Demo 6 in the notebook.
+
+Read the distance column first: 5.6 at 5 layers, 0.10 at 6. The embeddings
+collapse, and the accuracy follows.
+
+Do NOT oversell this as pure over-smoothing -- give both explanations. Then
+give them the rule, which holds either way.
+
+If you need long-range information: add a global node or a hierarchy, not depth.}
+
+% --- 21 ----------------------------------------------------------------
+\begin{frame}[fragile]{A complete GNN in 12 lines of PyTorch Geometric}
+\vspace{-0.2em}
+\begingroup\lstset{basicstyle=\ttfamily\footnotesize}
+\begin{lstlisting}
+from torch_geometric.nn import GCNConv
+from torch_geometric.data import Data
+
+data = Data(x=X, edge_index=A.nonzero().t().contiguous(), y=y)
+
+class GCN(nn.Module):
+    def __init__(self, d_in, d_hid, d_out):
+        super().__init__()
+        self.c1, self.c2 = GCNConv(d_in, d_hid), GCNConv(d_hid, d_out)
+
+    def forward(self, d):
+        h = F.relu(self.c1(d.x, d.edge_index))
+        return self.c2(h, d.edge_index)
+\end{lstlisting}
+\endgroup
+\vspace{-0.2em}
+\begin{center}
+  \small That is the whole model.
+  \alert{Everything hard happened on line 4}, where you chose the edges.
+\end{center}
+\end{frame}
+\note{Do not read the code. Point at line 4 -- \texttt{edge\_index} -- and say that this
+is the line the last twenty minutes were about.
+
+Library question: PyTorch Geometric. DGL if you need heterogeneous graphs.}
+
+% --- 22 ----------------------------------------------------------------
+\begin{frame}[fragile]{Run it yourself: everything above, on a free Colab CPU}
+  \vspace{0.5em}
+  \begin{center}
+    \small\texttt{\href{https://colab.research.google.com/github/Chung-I/MiRA_training_course_2026/blob/main/notebooks/gnn_demo.ipynb}{colab.research.google.com/github/Chung-I/MiRA\_training\_course\_2026/}}\\
+    \small\texttt{blob/main/notebooks/gnn\_demo.ipynb}
+  \end{center}
+  \vspace{0.8em}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      \small
+      PyTorch and NumPy only. Message passing is written out by hand so you can
+      read every line. PyTorch Geometric appears once, at the end, optional.
+      \vspace{0.8em}
+
+      \textbf{Right now, live:}
+      \begin{itemize}
+        \item \alert{Demo 4} --- node features are \emph{pure noise}
+        \item \alert{Demo 5} --- k-NN at $k = 3, 8, 20$
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.44\textwidth}
+      \centering
+      \vspace{0.2em}
+      {\small Demo 4: two communities, 200 nodes,\\ features carry \emph{no}
+       information}
+      \vspace{0.5em}
+
+      \begin{tabular}{@{}lr@{}}
+        \toprule
+        MLP on features only & 51.2\% \\
+        2-layer GCN          & \textcolor{good}{\textbf{91.3\%}} \\
+        \bottomrule
+      \end{tabular}
+
+      \vspace{0.8em}
+      \small\alert{The graph is the entire signal.}
+    \end{column}
+  \end{columns}
+\end{frame}
+\note{*** SWITCH TO THE COLAB NOTEBOOK HERE. ***
+
+Run Demo 4 first: it is the strongest number in the talk -- 51\% vs 91\% with
+features that are literally torch.randn. Then Demo 5 for the k-NN picture.
+
+If the room is dead, run Demo 1 instead (the MLP output changes when you
+renumber the nodes) -- it is faster and more visual.
+
+Budget 3 minutes on the notebook, hard stop. If a cell errors, do not debug
+live: go back to the slides and tell them the link is in the repo.
+
+CHECKPOINT: back on slides by 17:44.}
+
+% --- 23 ----------------------------------------------------------------
+\begin{frame}{When \emph{not} to use a GNN}
+  \vspace{1.0em}
+  \begin{itemize}
+    \setlength{\itemsep}{1.0em}
+    \item \textbf{Small and densely connected?} Just use a Transformer. It is
+      simpler, better tooled, and on a complete graph it is the same thing anyway.
+    \item \textbf{No real structure?} If you had to invent the edges to make it a
+      graph, you invented a prior. It may be wrong.
+    \item \textbf{Your data is a grid or a sequence?} You already have the right
+      architecture.
+  \end{itemize}
+  \vfill
+  \begin{center}\large
+    GNNs win when the structure is \alert{sparse, known, and large}.
+  \end{center}
+\end{frame}
+\note{Never present a method as universally good. This slide is what makes the
+previous twenty minutes trustworthy.
+
+Anticipated question -- "are GNNs still relevant now that everything is a
+transformer?" Answer: RoboBallet is 2025, and the learned-simulator line is
+alive. When the interaction structure is known and sparse, encoding it beats
+learning it, especially with limited data.}
+
+% --- 24 ----------------------------------------------------------------
+\begin{frame}{Is my problem a graph? --- a 3-question checklist}
+  \vspace{1.2em}
+  \begin{enumerate}
+    \setlength{\itemsep}{1.3em}
+    \item \Large Do I have \alert{entities with relations} between them?
+    \item \Large Is there \alert{no natural ordering} of those entities?
+    \item \Large Does the \alert{number of them change}?
+  \end{enumerate}
+  \vspace{1.4em}
+  \begin{center}\large
+    \textbf{Two yeses} $\Rightarrow$ try a GNN.
+  \end{center}
+\end{frame}
+\note{Slow down. This is the goal of the whole talk -- that they can recognize
+when their own problem is a graph.
+
+Give them five seconds of silence to run their own project through it.}
+
+% --- 25 ----------------------------------------------------------------
+\begin{frame}{Take-home}
+  \vspace{0.2em}
+  \begin{center}
+    \large
+    A GNN is one idea repeated: \alert{every node updates itself by summarizing
+    its neighbors.}\\[0.8em]
+    The hard part is never the layer --- it is deciding \alert{what the nodes
+    and the edges are.}
+  \end{center}
+  \vspace{1.1em}
+  \hrule
+  \vspace{0.7em}
+  \footnotesize
+  \textbf{Where to learn more}
+  \begin{itemize}\setlength{\itemsep}{0.15em}
+    \item Stanford \textbf{CS224W} --- the course, if you want the full picture
+    \item The \textbf{PyTorch Geometric} \texttt{examples/} directory --- the
+      fastest way to a working model
+    \item Distill, \emph{A Gentle Introduction to Graph Neural Networks} ---
+      one afternoon, all pictures
+    \item Battaglia et al., \arx{1806.01261} --- the position paper, if you want
+      the framing in full
+  \end{itemize}
+\end{frame}
+\note{Say the one-thing sentence one last time, word for word, exactly as on
+slide 2. Then the resources, fast.
+
+CHECKPOINT: 17:48. You promised 17:50 -- finishing early is a gift.}
+
+% --- 26 ----------------------------------------------------------------
+\begin{frame}[plain]
+  \vspace{2.2em}
+  \begin{center}
+    {\Huge Questions?}\\[2.0em]
+    {\large\color{dim}
+      \CJK{仲翊} \quad$\cdot$\quad MiRA Training Course 2026}\\[0.8em]
+    {\small\color{dim}
+      Slides and notebooks:
+      \texttt{github.com/Chung-I/MiRA\_training\_course\_2026}}
+  \end{center}
+\end{frame}
+\note{Q\&A prep:
+
+* "Isn't a Transformer just a GNN?" -> Yes, on a complete graph. Use a GNN when
+  you know the sparse structure and don't want to spend data learning it.
+* "How many layers?" -> Start at 2. Over-smoothing bites at 4. For long-range,
+  add a global node or a hierarchy, not depth.
+* "How do I build the graph for a point cloud?" -> k-NN with k around 16-20 in
+  xyz, edge feature = relative position. DGCNN recomputes it in feature space
+  each layer.
+* "Do GNNs scale?" -> Neighbor sampling or graph clustering. Most robotics
+  graphs are under 10k nodes, so you will not hit this.
+* "Are GNNs still relevant?" -> RoboBallet (2025) and the learned-simulator
+  line. Known + sparse structure beats learning it, especially with little data.
+* "Which library?" -> PyTorch Geometric. DGL for heterogeneous graphs.
+* Out of scope on purpose: spectral graph theory / the Laplacian, the WL test
+  and expressiveness, graph transformers, over-squashing, positional encodings,
+  heterogeneous / temporal / knowledge graphs.}
+
+\end{document}
