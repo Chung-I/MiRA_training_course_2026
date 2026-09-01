@@ -55,10 +55,12 @@ def bench_vllm(model_id, batch_sizes, n_tokens, util):
     return rows
 
 
-def bench_sglang(model_id, batch_sizes, n_tokens, util):
+def bench_sglang(model_id, batch_sizes, n_tokens, util, attention_backend='triton'):
     import sglang as sgl
+    # 'triton' avoids FlashInfer's nvcc-based JIT, which needs a full CUDA toolkit.
     llm = sgl.Engine(model_path=model_id, dtype='float16',
-                     mem_fraction_static=util, context_length=2048)
+                     mem_fraction_static=util, context_length=2048,
+                     attention_backend=attention_backend)
     sp = {'temperature': 0.0, 'max_new_tokens': n_tokens,
           'min_new_tokens': n_tokens, 'ignore_eos': True}
     llm.generate([PROMPT]*2, sp)                                # warm up
@@ -101,6 +103,7 @@ if __name__ == '__main__':
     ap.add_argument('--batch-sizes', default='1,2,4,8,16,32,64')
     ap.add_argument('--tokens', type=int, default=128)
     ap.add_argument('--gpu-util', type=float, default=0.45)
+    ap.add_argument('--attention-backend', default='triton')
     ap.add_argument('--out', default=None)
     a = ap.parse_args()
     bs_list = [int(x) for x in a.batch_sizes.split(',')]
@@ -114,7 +117,7 @@ if __name__ == '__main__':
     elif a.backend == 'trtllm':
         rows = bench_trtllm(a.model, bs_list, a.tokens, a.gpu_util)
     else:
-        rows = bench_sglang(a.model, bs_list, a.tokens, a.gpu_util)
+        rows = bench_sglang(a.model, bs_list, a.tokens, a.gpu_util, a.attention_backend)
 
     result = {'backend': a.backend, 'model': a.model, 'tokens': a.tokens,
               'rows': rows, 'wall_seconds': time.time()-t}

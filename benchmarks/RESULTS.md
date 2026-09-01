@@ -44,6 +44,36 @@ tok/s — about **20x the single-stream ceiling** — because the ceiling is per
 weights are read once for the whole batch, so every extra concurrent request is nearly
 free. This is the economic argument for continuous batching, measured.
 
+## SGLang: installed, could not serve on this machine
+
+SGLang 0.5.9 installs cleanly (11 GB, torch 2.9.1+cu128). It cannot serve here, and the
+reason is worth more than the missing table row.
+
+**This machine has no CUDA toolkit.** SGLang JIT-compiles attention kernels for the exact
+architecture it finds (`sm_120a`) at startup, through FlashInfer, which shells out to
+`nvcc`. There is no `nvcc` on this box, and the pip wheel that looks like it supplies one,
+`nvidia-cuda-nvcc-cu12` 12.8.93, installs exactly one binary: `ptxas`. Setting `CUDA_HOME`
+only moves the error from an assertion to an honest `nvcc: not found`.
+
+Switching to `attention_backend="triton"` gets past FlashInfer but fails the same way during
+CUDA graph capture (`ninja exited with status 127`).
+
+**Why there is no number here.** The remaining option is `disable_cuda_graph=True`. That
+would produce a figure, but SGLang without CUDA graphs against vLLM with them is not a
+comparison, it is a misattribution, and a reader would take it as evidence that SGLang is
+slower. A missing row is more honest than a misleading one.
+
+**The real fix**, for whoever picks this up: install a CUDA toolkit (`apt install
+nvidia-cuda-toolkit`, needs root, or `conda install -c nvidia cuda-nvcc` matching the
+venv's torch CUDA version), or run SGLang's official Docker image, which ships one.
+
+### The pattern across all three
+
+Every failure in this exercise was CUDA toolchain plumbing. None was about models, GPUs,
+or any framework's serving logic. Both engines demanded a compiler for FP8 and JIT paths
+that an fp16 0.5B benchmark never executes. "Just use vLLM" is one line in a README and
+rather more than one line on a machine that has not been prepared for it.
+
 ## Reproducing
 
 ```bash
