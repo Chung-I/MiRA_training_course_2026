@@ -749,33 +749,38 @@ of Movement 2: prefill is compute-bound, decode is bandwidth-bound, so give
 them different machines. Nice callback, one sentence, move on.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{TensorRT-LLM's trick is compiling ahead of time, and it bills you}
-  The other two \emph{interpret} your model at run time.
-  TensorRT-LLM \emphc{builds an engine} first: kernels fused, every GEMM
-  auto-tuned for your exact shapes and your exact GPU.
+\begin{frame}{TensorRT-LLM's trick is specializing to your exact hardware}
+  The other two \emph{interpret} your model at run time. TensorRT-LLM can
+  \emphc{compile an engine} first: kernels fused, every GEMM auto-tuned for your
+  exact shapes and your exact GPU.
   \vspace{0.5em}
   \begin{itemize}\small
     \item In-flight batching, paged KV cache, custom attention backends.
     \item FP8 on Hopper, FP4 on Blackwell.
     \item TP / PP / EP / DP parallelism.
   \end{itemize}
-  \vspace{0.8em}
+  \vspace{0.6em}
   \begin{center}
-    \begin{minipage}{0.9\textwidth}
-      \begin{alertblock}{Say the cost out loud}
-        You compile \textbf{per model, per shape range, per GPU}, and you
-        rebuild when any of the three changes.
+    \begin{minipage}{0.92\textwidth}
+      \begin{alertblock}{Two things we found by actually running it}
+        \textbf{1.} Version 1.2.1 defaults to a \textbf{PyTorch backend}, not the
+        engine build. The compile step is now a path you opt into.
 
         \vspace{0.3em}
-        That is the trade: the last 20\% of performance, in exchange for a
-        build step inside your deployment pipeline.
+        \textbf{2.} When you do compile, you compile \textbf{per model, per shape
+        range, per GPU}, and rebuild when any of the three changes. That is the
+        trade: the last of the performance, for a build step in your pipeline.
       \end{alertblock}
     \end{minipage}
   \end{center}
 \end{frame}
-\note{\textbf{27:00.} This is the fundamental tradeoff of the section:
-specialization versus flexibility. A research lab changes models weekly and
-should not pay a build step. A product on fixed hardware should.}
+\note{\textbf{27:00.} The fundamental tradeoff of the section: specialization
+versus flexibility. A research lab changes models weekly and should not pay a
+build step. A product on fixed hardware should.
+
+Do not describe the engine build as the thing TensorRT-LLM makes you do. We
+checked, and 1.2.1 starts a PyTorch runtime by default. The older framing is
+still repeated everywhere online and is now out of date.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{Start with vLLM. Move only for a reason.}
