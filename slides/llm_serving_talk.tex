@@ -56,7 +56,7 @@
 \newcommand{\demo}[1]{%
   \tikz[baseline=(x.base)]\node[fill=good, text=white, rounded corners=2pt,
         inner xsep=4pt, inner ysep=1.5pt, font=\bfseries\scriptsize] (x)
-        {LIVE DEMO -- notebook #1};}
+        {LIVE DEMO: notebook #1};}
 \newcommand{\cutbadge}[1]{%
   \tikz[baseline=(x.base)]\node[fill=warn, text=white, rounded corners=2pt,
         inner xsep=4pt, inner ysep=1.5pt, font=\bfseries\scriptsize] (x)
@@ -77,7 +77,7 @@
 % =========================================================================
 \maketitle
 \note{\textbf{0:00.} Name, and the promise: 40 minutes, and you leave able to
-size a deployment on paper. No architecture in this talk -- inference only.
+size a deployment on paper. No architecture in this talk: inference only.
 Do not say ``I will try to be quick''. Say the end time: 11:00.}
 
 % -------------------------------------------------------------------------
@@ -103,8 +103,8 @@ hoped it would load? Everyone. That is the state of the art in most labs.}
   \begin{alertblock}{The one thing}
     \textbf{Serving cost is decided by memory, not FLOPs.}
     Once you can compute the VRAM budget and the memory-bandwidth ceiling,
-    every deployment decision -- quantize, batch, shrink, or buy another GPU
-    -- follows from arithmetic instead of folklore.
+    every deployment decision (quantize, batch, shrink, or buy another GPU)
+    follows from arithmetic instead of folklore.
   \end{alertblock}
   \vspace{0.4em}
   Three questions, three pieces of arithmetic:
@@ -161,17 +161,17 @@ watching first and running it on the train home.}
   \end{center}
   \vspace{1.0em}
   \begin{itemize}
-    \item \textbf{Weights} -- a fixed cost, paid once, easy to compute.
-    \item \emphc{KV cache} -- paid \emph{per user, per token}. Nobody computes it.
-    \item \textbf{Activations} -- small at inference; batch-dependent.
-    \item \textbf{Overhead / fragmentation} -- allocator, CUDA context, workspace.
+    \item \textbf{Weights}: a fixed cost, paid once, easy to compute.
+    \item \emphc{KV cache}: paid \emph{per user, per token}. Nobody computes it.
+    \item \textbf{Activations}: small at inference; batch-dependent.
+    \item \textbf{Overhead / fragmentation}: allocator, CUDA context, workspace.
           Budget $\approx$ 2\,GB and stop worrying.
   \end{itemize}
   \vspace{0.6em}
   \uncover<2->{The first two decide everything. The talk is mostly about the second.}
 \end{frame}
-\note{\textbf{3:30.} Fragmentation gets a whole slide of its own later --
-it is what PagedAttention exists to kill.}
+\note{\textbf{3:30.} Fragmentation gets a whole slide of its own later.
+It is what PagedAttention exists to kill.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{Weights $=$ parameters $\times$ bytes. 70B in fp16 is 140\,GB.}
@@ -195,7 +195,7 @@ it is what PagedAttention exists to kill.}
   \end{center}
   \vspace{0.5em}
   \warnc{140\,GB} fits on no single card you own.
-  \emphc{35\,GB} fits on one 40\,GB card -- barely.
+  \emphc{35\,GB} fits on one 40\,GB card, barely.
   \textbf{That one line decides the whole deployment architecture.}
 \end{frame}
 \note{\textbf{4:30.} Read the 70B row out loud. This is the cheapest useful
@@ -235,7 +235,7 @@ them. That is all the architecture in this talk.}
       &= 2 \times 32 \times 8 \times 128 \times 2\ \text{bytes} \\[0.2em]
     \uncover<2->{&= 131{,}072\ \text{bytes} \;=\; \emphc{128\ \text{KiB per token}}} \\[0.6em]
     \uncover<3->{\text{An 8k conversation} &= 8192 \times 128\ \text{KiB}
-      \;=\; \warnc{1\ \text{GiB} \ \text{--- for one user}}}
+      \;=\; \warnc{1\ \text{GiB} \ \text{for one user}}}
   \end{align*}
   \vspace{0.4em}
   \uncover<3->{The weights are 16\,GB once. This 1\,GiB is charged again for
@@ -318,7 +318,7 @@ subtrahend or shrinking the denominator.}
 \end{frame}
 \note{\textbf{9:30.} Notebook Part 3 prints this table for any card you name.
 Note that quantizing the \emph{cache} pays exactly as much as quantizing the
-weights, once the weights are already small -- and almost nobody does it.
+weights, once the weights are already small, and almost nobody does it.
 End of Movement 1. You should be at 10 minutes.}
 
 % =========================================================================
@@ -367,7 +367,7 @@ talk. If they only remember one sentence from Movement 2, it is
           in int4 it reads \textbf{4\,GB}.
           Same card, same math, \emphc{four times the ceiling}.
     \item \uncover<2->{Quantization speeds up decoding because it
-          \emph{moves fewer bytes} --- not because it does less arithmetic.}
+          \emph{moves fewer bytes}, not because it does less arithmetic.}
     \item \uncover<3->{Small models are \emph{disproportionately} fast:
           their bottleneck is their own size.}
   \end{itemize}
@@ -407,7 +407,7 @@ not meaningfully cheaper; int4 \emph{traffic} is 4x cheaper.}
   \emphc{That 90\% gap is the entire argument for a real serving engine.}
 \end{frame}
 \note{\textbf{12:30.} Run this live. The 1.008 ratio buys you their trust in
-the arithmetic; the 9.4\% buys you Movement 3. Do not defend HuggingFace --
+the arithmetic; the 9.4\% buys you Movement 3. Do not defend HuggingFace.
 \texttt{generate()} is a correctness reference, not a server.}
 
 % -------------------------------------------------------------------------
@@ -432,15 +432,15 @@ the arithmetic; the 9.4\% buys you Movement 3. Do not defend HuggingFace --
   \vspace{0.4em}
   \begin{itemize}
     \item \textbf{Same wall-clock time.} Sixteen users served instead of one.
-    \item And what limits the batch? \emphc{The KV cache} --- back to Movement 1.
+    \item And what limits the batch? \emphc{The KV cache}, which takes us back to Movement 1.
   \end{itemize}
 \end{frame}
 \note{\textbf{13:30.} Run this live too. It is the most persuasive number in
 the talk. Let the 0.39\,s column land: the sixteenth user cost you nothing.
-This closes the loop -- cache capacity IS throughput.}
+This closes the loop: cache capacity IS throughput.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{Report TTFT, ITL and throughput --- never one average}
+\begin{frame}{Report TTFT, ITL and throughput, never one average}
   \begin{center}
     \begin{tabular}{lll}
       \toprule
@@ -455,13 +455,13 @@ This closes the loop -- cache capacity IS throughput.}
     \item Latency and throughput \emph{trade against each other}.
           Batching improves one and worsens the other.
     \item \warnc{A benchmark without a stated concurrency level is meaningless.}
-    \item ``Our server does 2000 tok/s'' -- at what batch size, and with
+    \item ``Our server does 2000 tok/s'': at what batch size, and with
           what TTFT?
   \end{itemize}
 \end{frame}
 \note{\textbf{15:00.} This is the slide that saves them from a bad
 paper table. Three numbers, always together, always with the concurrency.
-End of Movement 2 -- you should be at 18 minutes.}
+End of Movement 2. You should be at 18 minutes.}
 
 % =========================================================================
 \section{The toolbox, in order of payoff}
@@ -478,11 +478,11 @@ End of Movement 2 -- you should be at 18 minutes.}
     \item \emphc{Cache the prefix.} Shared system prompt or retrieved
           documents: prefill once, reuse.
     \item Speculative decoding. 1.5--3$\times$, identical output distribution.
-          \hfill\cutbadge{2 -- appendix}
+          \hfill\cutbadge{2: appendix}
     \item A smaller model, or one base $+$ many LoRA adapters.
-          \hfill\cutbadge{2 -- appendix}
+          \hfill\cutbadge{2: appendix}
     \item More GPUs. \emph{Last.}
-          \hfill\cutbadge{2 -- appendix}
+          \hfill\cutbadge{2: appendix}
   \end{enumerate}
   \vspace{0.3em}
   \begin{center}\small
@@ -605,7 +605,7 @@ gave it away.}
 PagedAttention}, arXiv:2309.06180.}
 \end{frame}
 \note{\textbf{20:00.} The most important picture in the talk. Say the OS
-analogy explicitly -- these are page tables. Then the payoff: waste drops
+analogy explicitly: these are page tables. Then the payoff: waste drops
 from ``the whole unused tail'' to ``at most one block'', and two requests
 with the same system prompt can literally point at the same physical blocks.}
 
@@ -618,14 +618,14 @@ with the same system prompt can literally point at the same physical blocks.}
       AWQ, GPTQ (post-training, weight-only); FP8 natively on Hopper and
       newer.\\[0.4em]
       $\approx \frac14$ the VRAM at 4-bit, and several times the decode speed
-      --- because it moves fewer bytes.
+      because it moves fewer bytes.
     \end{column}
     \begin{column}{0.49\textwidth}
       \textbf{\#3 The KV cache}\\[0.3em]
       \small
       fp8 or int8 cache. Directly \emph{doubles} the number of users you can
       hold.\\[0.4em]
-      Follows straight from Movement 1 --- and almost nobody turns it on.
+      Follows straight from Movement 1, and almost nobody turns it on.
       In our table it was 18 users $\rightarrow$ \emphc{36}.
     \end{column}
   \end{columns}
@@ -688,7 +688,7 @@ cheapest thing in the whole toolbox.}
   \vspace{0.6em}
   \textbf{The rest of the box}, all on by default or one flag away:
   \begin{itemize}\small
-    \item \textbf{Continuous batching} --- the V1 scheduler gives each request
+    \item \textbf{Continuous batching}: the V1 scheduler gives each request
           a token budget and treats prompt and output tokens alike.
     \item \textbf{Hash-based prefix caching}; \textbf{chunked prefill}
           (on by default, decode prioritized); \textbf{CUDA graphs}.
@@ -716,13 +716,13 @@ look up. Do not read the list.}
   \vspace{1.0em}
   \begin{itemize}
     \item A tree of \emph{spans} finds the longest shared prefix between a new
-          request and everything already cached --- not just an exact hit.
+          request and everything already cached, rather than only an exact hit.
     \item That structure is also what makes the cache \textbf{tierable}:
           you can evict a subtree instead of guessing about blocks.
   \end{itemize}
   \vspace{0.5em}
-  \emphc{If your workload is many requests sharing long, varied prefixes ---
-  agents, tool calls, few-shot prompts --- this is the difference.}
+  \emphc{If your workload is many requests sharing long, varied prefixes
+  (agents, tool calls, few-shot prompts), this is the difference.}
 \end{frame}
 \note{\textbf{25:00.} The distinction that matters: a hash needs the prefix to
 match exactly at a block boundary; a radix tree finds partial overlap. Agent
@@ -740,7 +740,7 @@ traffic is nothing but partial overlap.}
           scheduling policy.
     \item \textbf{EAGLE-2/3 and adaptive speculative decoding.}
     \item \textbf{Prefill/decode disaggregation} onto separate server groups
-          --- the two phases have opposite bottlenecks, so stop making them
+          because the two phases have opposite bottlenecks, so stop making them
           share a GPU. (EPD additionally splits vision encoding, for VLMs.)
   \end{itemize}
 \end{frame}
@@ -749,7 +749,7 @@ of Movement 2: prefill is compute-bound, decode is bandwidth-bound, so give
 them different machines. Nice callback, one sentence, move on.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{TensorRT-LLM's trick is compiling ahead of time --- and it bills you}
+\begin{frame}{TensorRT-LLM's trick is compiling ahead of time, and it bills you}
   The other two \emph{interpret} your model at run time.
   TensorRT-LLM \emphc{builds an engine} first: kernels fused, every GEMM
   auto-tuned for your exact shapes and your exact GPU.
@@ -763,7 +763,7 @@ them different machines. Nice callback, one sentence, move on.}
   \begin{center}
     \begin{minipage}{0.9\textwidth}
       \begin{alertblock}{Say the cost out loud}
-        You compile \textbf{per model, per shape range, per GPU} --- and you
+        You compile \textbf{per model, per shape range, per GPU}, and you
         rebuild when any of the three changes.
 
         \vspace{0.3em}
@@ -832,11 +832,11 @@ survey. End of Movement 3b.}
   \end{center}
 \end{frame}
 \note{\textbf{28:30.} This is the slide that makes the talk land in this room.
-50\,Hz means 20\,ms -- and not 20\,ms on average, 20\,ms at the tail. A p99 of
+50\,Hz means 20\,ms, and not 20\,ms on average, 20\,ms at the tail. A p99 of
 60\,ms is a robot that jerks.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{vLLM-Omni: stages, not one model --- and one stage emits actions}
+\begin{frame}{vLLM-Omni: stages, not one model, and one stage emits actions}
   A superset of vLLM for omni-modality: text, image, audio, video and
   \emphc{actions}.
   \vspace{0.6em}
@@ -846,7 +846,7 @@ survey. End of Movement 3b.}
           parallelism. An autoregressive stage and a diffusion/DiT stage sit
           in one pipeline, with overlapped execution and disaggregated
           resources.
-    \item \textbf{\texttt{Pi0Pipeline}} --- takes raw robot observations, runs
+    \item \textbf{\texttt{Pi0Pipeline}} takes raw robot observations, runs
           flow-matching denoising, returns continuous \emph{action chunks}.
     \item Served with \texttt{vllm serve --deploy-config pi0.yaml}, and it
           exposes an \textbf{OpenPI realtime robot endpoint}
@@ -861,7 +861,7 @@ forward pass''.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{FlashRT: no compile, hand-written kernels, one CUDA graph}
-  The opposite design point from TensorRT-LLM ---
+  The opposite design point from TensorRT-LLM:
   \emphc{no compilation, no ONNX export}.
   \vspace{0.6em}
   \begin{itemize}
@@ -870,7 +870,7 @@ forward pass''.}
     \item \textbf{Delegates the compute-bound ones} to cuBLASLt / CUTLASS /
           FlashAttention-2.
     \item \textbf{The entire forward pass captured as one static CUDA graph}
-          --- zero Python dispatch at replay time.
+          so there is zero Python dispatch at replay time.
     \item \textbf{Static FP8 (E4M3) and NVFP4}, calibration scales cached to
           disk; RMSNorm's $(1+w)$ folded into the next GEMM at load time.
   \end{itemize}
@@ -880,7 +880,7 @@ forward pass''.}
   \end{center}
 \end{frame}
 \note{\textbf{30:30.} At batch 1 with a 20\,ms budget, Python dispatch of a
-few hundred kernels is not noise -- it is a large fraction of the frame. One
+few hundred kernels is not noise. It is a large fraction of the frame. One
 CUDA graph replaces all of it with a single launch.}
 
 % -------------------------------------------------------------------------
@@ -890,10 +890,10 @@ CUDA graph replaces all of it with a single launch.}
       \toprule
       model & hardware & latency & against \\
       \midrule
-      pi0.5, 2-view, FP8 & RTX 5090       & \textbf{17.6\,ms} (57\,Hz) & --- \\
+      pi0.5, 2-view, FP8 & RTX 5090       & \textbf{17.6\,ms} (57\,Hz) & n/a \\
       pi0.5, 2-view, FP8 & Jetson AGX Thor & \textbf{44.0\,ms} (23\,Hz)
         & \emphc{13.9$\times$} vs OpenPI reference, 714\,ms \\
-      pi0, 2-view, FP8   & RTX 5090       & 21.2\,ms (47\,Hz) & --- \\
+      pi0, 2-view, FP8   & RTX 5090       & 21.2\,ms (47\,Hz) & n/a \\
       GR00T N1.6, $T{=}50$ & RTX 5090     & 13.1\,ms (76\,Hz)
         & 2.37$\times$ vs TensorRT's 31\,ms \\
       \bottomrule
@@ -906,7 +906,7 @@ CUDA graph replaces all of it with a single launch.}
     \begin{minipage}{0.9\textwidth}
       \begin{alertblock}{The teaching point}
         \centering
-        Quantization, kernel fusion, removing dispatch overhead ---
+        Quantization, kernel fusion and removing dispatch overhead:
         \textbf{the same three ideas as the LLM half of this talk,}
         aimed at a batch of one.\\[0.3em]
         That is why serving is worth learning even if you only ever run robots.
@@ -915,8 +915,8 @@ CUDA graph replaces all of it with a single launch.}
   \end{center}
 \end{frame}
 \note{\textbf{31:30.} Land this hard. Same architecture, same weights, 16x
-faster on the same board. Nobody trained anything. End of Movement 3c --
-you should be at 32 minutes.}
+faster on the same board. Nobody trained anything. End of Movement 3c.
+You should be at 32 minutes.}
 
 % =========================================================================
 \section{Deciding, and measuring}
@@ -970,7 +970,7 @@ you should be at 32 minutes.}
 not the first. Most labs buy a card when a flag would have done.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{Dollars per million tokens --- and when to just use an API}
+\begin{frame}{Dollars per million tokens, and when to just use an API}
   \begin{equation*}
     \text{\$ per 1M tokens}
       \;=\;
@@ -980,7 +980,7 @@ not the first. Most labs buy a card when a flag would have done.}
   \vspace{0.4em}
   \begin{itemize}
     \item \warnc{tokens/sec must be your \emph{aggregate} throughput}, across
-          all concurrent requests --- not single-stream speed. This is why
+          all concurrent requests, not single-stream speed. This is why
           batching is an \emph{economic} decision, not an engineering one.
     \item An owned GPU sitting idle costs the same as a busy one.
   \end{itemize}
@@ -989,7 +989,7 @@ not the first. Most labs buy a card when a flag would have done.}
     \begin{minipage}{0.9\textwidth}
       \begin{block}{The honest answer}
         \small
-        Self-hosting usually \emph{loses} to an API --- unless you have
+        Self-hosting usually \emph{loses} to an API, unless you have
         \textbf{sustained high utilization}, a \textbf{fine-tuned model}, or
         \textbf{data that legally cannot leave the building}.
 
@@ -1032,13 +1032,13 @@ your arithmetic.}
   \vspace{0.2em}
   \begin{enumerate}
     \item \textbf{Compute the weight memory} before you download anything.
-    \item \textbf{Compute the KV cache per token} --- that is your user capacity.
+    \item \textbf{Compute the KV cache per token}. That is your user capacity.
     \item \textbf{Serve it with vLLM or SGLang.} Never a for-loop.
     \item \textbf{Quantize to int4}, then re-run \emph{your own} eval.
     \item \textbf{Quantize the KV cache as well.}
     \item \textbf{Cache the prefix} if your prompts share one.
     \item \textbf{Report TTFT, ITL and throughput at a stated concurrency}
-          --- or report nothing.
+          or report nothing.
   \end{enumerate}
   \vspace{0.6em}
   \begin{center}\small
@@ -1055,7 +1055,7 @@ seconds and let them take it. Then the take-home.}
     \begin{minipage}{0.9\textwidth}
       \begin{alertblock}{}
         \centering\large
-        The model you can serve is more useful than the model you cannot ---
+        The model you can serve is more useful than the model you cannot,
         and \emph{which one you can serve} is decided by memory bandwidth and
         VRAM.
 
@@ -1085,7 +1085,7 @@ seconds and let them take it. Then the take-home.}
     Leave this slide up. Parts 1--5 run on a free CPU runtime.
   \end{center}
 \end{frame}
-\note{\textbf{37:30 -- 40:00 for questions.} Leave the checklist slide up
+\note{\textbf{37:30 to 40:00 for questions.} Leave the checklist slide up
 instead of this one if the room is quiet. Backup slides follow.}
 
 % =========================================================================
@@ -1097,18 +1097,18 @@ instead of this one if the room is quiet. Backup slides follow.}
   {\normalsize Cut candidates, in cut order}
 \end{frame}
 \note{Not shown unless asked. Cut order comes from the plan: Movement 3d
-first, then the tail of the toolbox. Movements 3b and 3c are never cut ---
+first, then the tail of the toolbox. Movements 3b and 3c are never cut, because
 the named engines and the robot contrast are what this room will use.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{\cutbadge{1 -- cut this first} \; The layer below: Triton, and a training contrast}
+\begin{frame}{\cutbadge{1: cut this first} \; The layer below: Triton, and a training contrast}
   \vspace{0.4em}
   \begin{itemize}
-    \item \textbf{Triton} --- a Python DSL for GPU kernels. You write
+    \item \textbf{Triton} is a Python DSL for GPU kernels. You write
           tile-level code; the compiler handles coalescing, shared memory and
           layout. It is what people write custom kernels in now instead of raw
           CUDA, and it appears \emph{inside} every stack in this talk.
-    \item \textbf{Liger-Kernel} --- fused Triton kernels (RMSNorm, RoPE,
+    \item \textbf{Liger-Kernel} is a set of fused Triton kernels (RMSNorm, RoPE,
           SwiGLU, fused linear cross-entropy), claiming $+20\%$ throughput and
           $-60\%$ memory.
 
@@ -1126,7 +1126,7 @@ the named engines and the robot contrast are what this room will use.}
 when you reach Movement 3c, you have already skipped this.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{\cutbadge{2 -- trim next} \; \#5 Speculative decoding: 2$\times$, and the same output}
+\begin{frame}{\cutbadge{2: trim next} \; \#5 Speculative decoding: 2$\times$, and the same output}
   \begin{itemize}
     \item A \textbf{small draft model} proposes $k$ tokens.
     \item The \textbf{big model verifies all $k$ in a single forward pass}.
@@ -1135,7 +1135,7 @@ when you reach Movement 3c, you have already skipped this.}
   \vspace{0.8em}
   \begin{center}
     \begin{minipage}{0.9\textwidth}
-      \begin{block}{Why it works --- a callback to Movement 2}
+      \begin{block}{Why it works, a callback to Movement 2}
         You are \emph{bandwidth-bound}, so you have \emph{spare compute}.
         Verifying $k$ tokens costs roughly one token's worth of weight
         traffic. You are buying speed with compute you were not using.
@@ -1144,14 +1144,14 @@ when you reach Movement 3c, you have already skipped this.}
   \end{center}
   \vspace{0.6em}
   Typically 1.5--3$\times$ faster, with an \emphc{identical output
-  distribution} --- it is not an approximation.
+  distribution}. It is not an approximation.
 \end{frame}
 \note{The ``identical distribution'' part is what makes it different from
 every other trick here: it is provably free of quality loss. Worth 30 seconds
 if you have them.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{\cutbadge{2 -- trim next} \; \#6 A smaller model, and \#7 more GPUs, last}
+\begin{frame}{\cutbadge{2: trim next} \; \#6 A smaller model, and \#7 more GPUs, last}
   \begin{columns}[T]
     \begin{column}{0.49\textwidth}
       \textbf{\#6 Serve a smaller model}\\[0.3em]
@@ -1164,12 +1164,12 @@ if you have them.}
       \emph{(Adapters here are a serving trick. Training is another talk.)}
     \end{column}
     \begin{column}{0.49\textwidth}
-      \textbf{\#7 More GPUs --- last}\\[0.3em]
+      \textbf{\#7 More GPUs, last}\\[0.3em]
       \small
       \textbf{Tensor parallel} inside a node; needs a fast interconnect
       (NVLink), or you have moved the bottleneck to the wire.\\[0.5em]
       \textbf{Pipeline parallel} across nodes.\\[0.5em]
-      \textbf{CPU offload} as a last resort --- and it is slow for exactly the
+      \textbf{CPU offload} as a last resort, and it is slow for exactly the
       same reason everything else is slow: PCIe bandwidth is more than an
       order of magnitude below HBM, and decode is bandwidth-bound.
     \end{column}
@@ -1186,7 +1186,7 @@ the least likely to be necessary.}
           fine-tuned model, or data that cannot leave the building. Do the
           \$/1M math.
     \item \textbf{Does quantization hurt quality?} Sometimes, and not
-          uniformly across tasks. 4-bit weight-only is usually fine --- confirm
+          uniformly across tasks. 4-bit weight-only is usually fine, but confirm
           on \emph{your} eval, not on perplexity.
     \item \textbf{Why is my model slow on a big GPU?} You are bandwidth-bound
           at batch 1. Batch it, or shrink the bytes.
@@ -1194,12 +1194,12 @@ the least likely to be necessary.}
           structured output and prefix reuse; TensorRT-LLM for the last 20\%
           on fixed NVIDIA hardware.
     \item \textbf{How much VRAM for a 70B?} int4 $\approx$ 35\,GB of weights,
-          plus cache. In practice two 40\,GB cards or one 80\,GB card --- and
+          plus cache. In practice two 40\,GB cards or one 80\,GB card, and
           you will still want a quantized KV cache.
     \item \textbf{CPU offload?} You can, and it will be slow. PCIe is $>10\times$
           below HBM.
     \item \textbf{MoE?} Fewer \emph{active} parameters per token, so faster
-          decode --- but you still hold \emph{all} the experts in VRAM. Good
+          decode, but you still hold \emph{all} the experts in VRAM. Good
           for speed, no help for capacity.
   \end{itemize}
 \end{frame}
@@ -1211,7 +1211,7 @@ the least likely to be necessary.}
   \begin{itemize}
     \item \textbf{Llama-3-8B} 32 layers / 8 KV heads / head\_dim 128;
           \textbf{Llama-2-7B} 32 KV heads. From the models' own
-          \texttt{config.json} --- notebook Part 2 pulls them live.
+          \texttt{config.json}. Notebook Part 2 pulls them live.
     \item \textbf{Capacity table} (7 / 18 / 36 users): notebook Part 3,
           24\,GB card, 8k context, 2\,GB overhead.
     \item \textbf{0.920 vs 0.928\,GB, 169.9 vs 1811.6 tok/s, batch 1
