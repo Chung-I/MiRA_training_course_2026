@@ -847,10 +847,10 @@ CHECKPOINT: 17:48. You promised 17:50. Finish early.}
       model generalizes worse despite fitting the training set.
     \end{column}
     \begin{column}{0.47\textwidth}
-      \textbf{8 layers:} the baseline train accuracy drops to 88.1\%.
+      \textbf{8 layers:} the baseline train accuracy drops to 82.4\%.
       \alert{Residual connections} fix this to 100\%, confirming training
       difficulty (vanishing gradients). But test accuracy still drops to
-      71.7\%, because over-smoothing degrades generalization even when
+      74.6\%, because over-smoothing degrades generalization even when
       training succeeds.
     \end{column}
   \end{columns}
@@ -859,11 +859,10 @@ CHECKPOINT: 17:48. You promised 17:50. Finish early.}
 \texttt{notebooks/pyg\_node\_classification.ipynb}. Open it in Colab to see
 the cached outputs.
 
-The key finding: residuals fix the training failure at 8 layers but do not
-fix the test accuracy loss. The model fits the data perfectly at every depth
-with residuals, but generalizes worse with more layers. Over-smoothing is the
-generalization bottleneck. Training difficulty is the training bottleneck.
-Both contribute, at different depths.
+The key finding: residuals fix the training failure at 8 layers (82.4\%
+$\rightarrow$ 100\% train) but do not fix the test accuracy loss (74.6\% test,
+down from 80.8\% at 2 layers). Over-smoothing degrades generalization even
+when training succeeds. Both factors contribute at different depths.
 
 Li et al., ``Deeper Insights into Graph Convolutional Networks for
 Semi-Supervised Learning,'' AAAI 2018.}
