@@ -99,7 +99,7 @@ deployment on paper. Inference only, no architecture. Say the end time: 11:00.}
 loads? Everyone.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{It is arithmetic, and by 11:00 you can do it}
+\begin{frame}{Serving cost is arithmetic on two numbers}
   \begin{alertblock}{The one thing}
     \textbf{Memory decides serving cost.}
     Compute the VRAM budget and the memory-bandwidth ceiling. Then each
@@ -152,7 +152,7 @@ watch first and run it on the train home.}
 \section{The VRAM budget}
 % =========================================================================
 
-\begin{frame}{Four things live in your VRAM. You forget one of them.}
+\begin{frame}{Four things occupy VRAM, and the KV cache is the one most people forget}
   \vspace{0.5em}
   \begin{center}\Large
     weights \;$+$\; \emphc{KV cache} \;$+$\; activations \;$+$\;
@@ -164,10 +164,10 @@ watch first and run it on the train home.}
     \item \emphc{KV cache}: paid \emph{per user, per token}. Few people compute it.
     \item \textbf{Activations}: small at inference, and batch-dependent.
     \item \textbf{Overhead / fragmentation}: allocator, CUDA context, workspace.
-          Budget $\approx$ 2\,GB and do not worry.
+          A 2\,GB budget covers it.
   \end{itemize}
   \vspace{0.6em}
-  \uncover<2->{The first two set the budget. Most of this talk is about the second.}
+  \uncover<2->{The weights and the KV cache set the budget.}
 \end{frame}
 \note{\textbf{3:30.} Fragmentation gets a whole slide of its own later.
 PagedAttention exists to remove it.}
@@ -308,7 +308,8 @@ Each tool in the toolbox shrinks the weights term or the denominator.}
   \end{center}
   \vspace{0.8em}
   \begin{center}\large
-    \textbf{Same GPU, same model, two flags: \emphc{five times the users.}}
+    \textbf{The same GPU and model serve \emphc{five times the users} after two
+    config changes: int4 weights and an fp8 cache.}
   \end{center}
 \end{frame}
 \note{\textbf{9:30.} Notebook Part 3 prints this table for any card that you name.
@@ -398,7 +399,7 @@ is 4x cheaper.}
     \end{tabular}
   \end{center}
   \vspace{0.4em}
-  \emphc{That 90\% gap is the argument for a serving engine.}
+  \emphc{A serving engine exists to close that 90\% gap.}
 \end{frame}
 \note{\textbf{12:30.} Run this live. The 1.008 ratio earns their trust in the
 arithmetic. The 9.4\% earns you Movement 3. \texttt{generate()} is a
@@ -426,7 +427,7 @@ correctness reference.}
   \vspace{0.4em}
   \begin{itemize}
     \item \textbf{Same wall-clock time.} You serve sixteen users instead of one.
-    \item \emphc{The KV cache} limits the batch, which takes us back to Movement 1.
+    \item \emphc{The KV cache capacity} limits the batch size.
   \end{itemize}
 \end{frame}
 \note{\textbf{13:30.} Run this live too. It is the most persuasive number in the talk.
@@ -461,7 +462,7 @@ End of Movement 2. Target: 18 minutes.}
 \section{The toolbox, in order of payoff}
 % =========================================================================
 
-\begin{frame}{The toolbox, ranked. The ranking is the content.}
+\begin{frame}{The toolbox, ranked by payoff}
   \begin{enumerate}\small
     \item \emphc{Use a real serving engine.} vLLM / SGLang / TensorRT-LLM.
           One-line change, largest single payoff.
@@ -478,10 +479,6 @@ End of Movement 2. Target: 18 minutes.}
     \item More GPUs. \emph{Last.}
           \hfill\cutbadge{2: appendix}
   \end{enumerate}
-  \vspace{0.3em}
-  \begin{center}\small
-    The order is what you take home.
-  \end{center}
 \end{frame}
 \note{\textbf{18:00.} If you are behind schedule, this frame alone carries
 items 5--7, and you skip their appendix slides. Say the order
@@ -494,7 +491,7 @@ aloud. The order is the deliverable.}
       \textbf{Continuous batching}\\[0.3em]
       \small A finished request \emph{leaves the batch immediately}. It does
       not wait for the slowest one in its group. New requests join on the
-      next step. No head-of-line blocking.
+      next step. There is no head-of-line blocking.
     \end{column}
     \begin{column}{0.48\textwidth}
       \textbf{PagedAttention}\\[0.3em]
@@ -697,7 +694,8 @@ find later. Do not read the list.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{The SGLang trick is RadixAttention: longest-prefix match}
-  \textbf{Same goal as prefix caching. Different data structure.}
+  \textbf{RadixAttention has the same goal as prefix caching, with a different
+  data structure.}
   \vspace{0.6em}
   \begin{center}
     \begin{tabular}{ll}
@@ -802,8 +800,9 @@ repeat the older description, and it is out of date.}
           $\sim$4$\times$ faster \emph{per token}.
     \item At batch 1, \texttt{generate()} reaches \textbf{9\%} of this model's
           bandwidth ceiling. vLLM reaches \textbf{40\%}.
-    \item \textbf{Do not read a winner here.} On a 0.5\,B model you measure
-          dispatch overhead, and TRT-LLM is far outside its design envelope.
+    \item \textbf{This table does not rank the engines.} On a 0.5\,B model the
+          measurement is dominated by dispatch overhead, and TRT-LLM is far
+          outside its design envelope.
   \end{itemize}
 \end{frame}
 \note{\textbf{29:00.} These are our own numbers, from two days ago. The 4$\times$ is the
@@ -862,7 +861,8 @@ a crash stops you.}
   \end{center}
   \vspace{1.2em}
   \begin{center}\large
-    Do not start with TensorRT-LLM.
+    TensorRT-LLM is the wrong first choice for a research lab, because the
+    build step repeats for every model change.
   \end{center}
 \end{frame}
 \note{\textbf{28:00.} Be decisive. They came for a recommendation. End of Movement 3b.}
@@ -986,7 +986,7 @@ Target: 32 minutes.}
 \section{Deciding, and measuring}
 % =========================================================================
 
-\begin{frame}{The decision tree fits on one slide}
+\begin{frame}{Two questions decide the deployment}
 \vspace{0.9em}
 \begin{center}
 \begin{tikzpicture}[
@@ -1240,16 +1240,12 @@ that point.}
           $-60\%$ memory.
 
           \vspace{0.3em}
-          \warnc{For training, not serving.} Mention it only as the contrast:
-          the same technique, the other half of the lifecycle.
+          \warnc{Liger-Kernel is for training, not serving.} It is the same
+          technique applied to the other half of the lifecycle.
   \end{itemize}
-  \vspace{0.6em}
-  \begin{center}\small
-    This whole frame is Movement 3d. If the talk runs long, remove this
-    frame first.
-  \end{center}
 \end{frame}
-\note{One optional slide, and the first to cut. If you are past 30 minutes
+\note{This whole frame is Movement 3d. If the talk runs long, remove this
+frame first. One optional slide, and the first to cut. If you are past 30 minutes
 when you reach Movement 3c, skip this.}
 
 % -------------------------------------------------------------------------
