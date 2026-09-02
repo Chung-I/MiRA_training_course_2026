@@ -506,25 +506,63 @@ GCN output stays the same, while an MLP output changes.}
 
 % --- 11 ---------------------------------------------------------------
 \begin{frame}{A GNN accepts a variable number of nodes and edges}
-  \vspace{1.0em}
-  A GNN represents its input as a set of nodes and an edge list. Adding or
-  removing a node changes the set, not a fixed-size vector, so the same
-  trained weights run on inputs of any size.
-  \vspace{1.0em}
-  \begin{itemize}
-    \setlength{\itemsep}{0.7em}
-    \item GNS trained on scenes with thousands of particles and generalized to
-          $10\times$ more particles at test time. \arx{2002.09405}
-    \item DPI-Net uses one node per particle, and that count differs per object
-          and per timestep (fluids gain and lose particles). \arx{1810.01566}
-    \item A scene graph has one node per detected object, and the number of
-          objects in the room changes between scenes. \arx{2002.06289}
-  \end{itemize}
+  \vspace{0.2em}
+  \begin{columns}[c]
+    \begin{column}{0.42\textwidth}
+      \centering
+      \begin{tikzpicture}[
+        font=\scriptsize,
+        nd/.style={circle, draw=acc2, fill=acc2!15, minimum size=4mm,
+                   inner sep=0pt},
+        ed/.style={acc2, line width=0.4pt},
+      ]
+      % Small graph: 4 nodes
+      \node[nd] (a0) at (0,0.5) {};
+      \node[nd] (a1) at (0.8,1.0) {};
+      \node[nd] (a2) at (0.9,0.0) {};
+      \node[nd] (a3) at (1.6,0.6) {};
+      \draw[ed] (a0)--(a1); \draw[ed] (a0)--(a2);
+      \draw[ed] (a1)--(a3); \draw[ed] (a2)--(a3);
+      \node[font=\tiny, color=dim] at (0.8,-0.5) {4 nodes};
+
+      % Arrow
+      \draw[-{Latex[length=2mm]}, black!40, thick] (2.2,0.5) -- (3.0,0.5);
+      \node[font=\tiny, color=dim] at (2.6,0.85) {same weights};
+
+      % Larger graph: 8 nodes
+      \node[nd] (b0) at (3.5,1.2) {};
+      \node[nd] (b1) at (4.2,1.4) {};
+      \node[nd] (b2) at (4.9,1.1) {};
+      \node[nd] (b3) at (3.3,0.4) {};
+      \node[nd] (b4) at (4.0,0.5) {};
+      \node[nd] (b5) at (4.7,0.3) {};
+      \node[nd] (b6) at (3.8,-0.2) {};
+      \node[nd] (b7) at (5.3,0.7) {};
+      \draw[ed] (b0)--(b1); \draw[ed] (b1)--(b2); \draw[ed] (b0)--(b3);
+      \draw[ed] (b3)--(b4); \draw[ed] (b4)--(b5); \draw[ed] (b5)--(b7);
+      \draw[ed] (b3)--(b6); \draw[ed] (b4)--(b6); \draw[ed] (b2)--(b7);
+      \draw[ed] (b1)--(b4);
+      \node[font=\tiny, color=dim] at (4.3,-0.5) {8 nodes};
+      \end{tikzpicture}
+    \end{column}
+    \begin{column}{0.55\textwidth}
+      \small
+      Message passing applies the same function to each node and its
+      neighbors. The node count is not a parameter of the model.
+      \vspace{0.5em}
+      \begin{itemize}\setlength{\itemsep}{0.5em}
+        \item GNS trained on thousands of particles and generalized to
+              $10\times$ more at test time. \arx{2002.09405}
+        \item DPI-Net handles varying particle counts per timestep.
+              \arx{1810.01566}
+        \item Scene graphs change size with the room. \arx{2002.06289}
+      \end{itemize}
+    \end{column}
+  \end{columns}
 \end{frame}
-\note{The mechanism: message passing applies the same learned function to each
-node and its neighbors, so the number of nodes is not a parameter of the model.
-An MLP takes a fixed-length vector, so the number of objects is baked into the
-architecture.}
+\note{The diagram shows the same weights processing a 4-node graph and an
+8-node graph. Message passing is local and shared, so the model does not
+encode the number of nodes.}
 
 % --- 12 ---------------------------------------------------------------
 \begin{frame}{A Transformer is a GNN on the complete graph}
