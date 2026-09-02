@@ -153,24 +153,93 @@ watch first and run it on the train home.}
 % =========================================================================
 
 \begin{frame}{Four things occupy VRAM, and the KV cache is the one most people forget}
-  \vspace{0.5em}
-  \begin{center}\Large
-    weights \;$+$\; \emphc{KV cache} \;$+$\; activations \;$+$\;
-    framework overhead
-  \end{center}
-  \vspace{1.0em}
-  \begin{itemize}
-    \item \textbf{Weights}: a fixed cost, paid once, easy to compute.
-    \item \emphc{KV cache}: paid \emph{per user, per token}. Few people compute it.
-    \item \textbf{Activations}: small at inference, and batch-dependent.
-    \item \textbf{Overhead / fragmentation}: allocator, CUDA context, workspace.
-          A 2\,GB budget covers it.
-  \end{itemize}
-  \vspace{0.6em}
-  \uncover<2->{Weights are a fixed cost. The KV cache grows with each concurrent user.}
+  \vspace{0.2em}
+  \begin{columns}[c]
+    \begin{column}{0.55\textwidth}
+      \begin{center}
+        \begin{tikzpicture}[
+          font=\scriptsize,
+          bar/.style={minimum height=0.5cm, inner sep=0pt, anchor=south west,
+                      font=\tiny\bfseries},
+        ]
+        \def\totalW{8.0}  % bar width in cm for 24 GB
+        \def\scale{0.333}  % cm per GB
+
+        % --- Bar 1: fp16, 2 users (weights dominate) ---
+        \node[font=\tiny, anchor=east] at (-0.1, 0.25) {fp16, 2 users};
+        % weights: 14.9 GB
+        \node[bar, fill=accent!40, minimum width=14.9*\scale cm, text=black]
+          (w1) at (0, 0) {weights 14.9};
+        % KV: 2 users * 1 GiB = 2 GB
+        \node[bar, fill=warn!40, minimum width=2.0*\scale cm, text=black]
+          at (14.9*\scale, 0) {KV 2.0};
+        % activations: ~0.1
+        \node[bar, fill=good!30, minimum width=0.1*\scale cm]
+          at (16.9*\scale, 0) {};
+        % overhead: 2 GB
+        \node[bar, fill=black!15, minimum width=2.0*\scale cm, text=black]
+          at (17.0*\scale, 0) {OH 2};
+        % free
+        \node[bar, fill=black!5, draw=black!20, minimum width=5.0*\scale cm,
+              text=black!50] at (19.0*\scale, 0) {free 5.0};
+        % 24 GB marker
+        \draw[black!40] (24*\scale, -0.05) -- (24*\scale, 0.55);
+        \node[font=\tiny, black!50] at (24*\scale, 0.7) {24\,GB};
+
+        % --- Bar 2: fp16, 7 users (KV fills the card) ---
+        \node[font=\tiny, anchor=east] at (-0.1, -0.75) {fp16, 7 users};
+        \node[bar, fill=accent!40, minimum width=14.9*\scale cm, text=black]
+          at (0, -1.0) {weights 14.9};
+        \node[bar, fill=warn!40, minimum width=5.1*\scale cm, text=black]
+          at (14.9*\scale, -1.0) {\alert{KV 5.1}};
+        \node[bar, fill=good!30, minimum width=0.1*\scale cm]
+          at (20.0*\scale, -1.0) {};
+        \node[bar, fill=black!15, minimum width=2.0*\scale cm, text=black]
+          at (20.1*\scale, -1.0) {OH 2};
+        \node[bar, fill=black!5, draw=black!20, minimum width=1.9*\scale cm,
+              text=black!50] at (22.1*\scale, -1.0) {\tiny 1.9};
+        \draw[black!40] (24*\scale, -1.05) -- (24*\scale, -0.45);
+
+        % --- Bar 3: int4, 7 users (weights shrunk) ---
+        \node[font=\tiny, anchor=east] at (-0.1, -1.75) {int4, 7 users};
+        \node[bar, fill=accent!25, minimum width=3.7*\scale cm, text=black]
+          at (0, -2.0) {w 3.7};
+        \node[bar, fill=warn!40, minimum width=5.1*\scale cm, text=black]
+          at (3.7*\scale, -2.0) {KV 5.1};
+        \node[bar, fill=good!30, minimum width=0.1*\scale cm]
+          at (8.8*\scale, -2.0) {};
+        \node[bar, fill=black!15, minimum width=2.0*\scale cm, text=black]
+          at (8.9*\scale, -2.0) {OH 2};
+        \node[bar, fill=black!5, draw=black!20, minimum width=13.1*\scale cm,
+              text=black!50] at (10.9*\scale, -2.0) {free 13.1};
+        \draw[black!40] (24*\scale, -2.05) -- (24*\scale, -1.45);
+
+        \end{tikzpicture}
+      \end{center}
+    \end{column}
+    \begin{column}{0.42\textwidth}
+      \small
+      \begin{itemize}\setlength{\itemsep}{0.5em}
+        \item \textbf{Weights}: fixed, paid once.
+        \item \emphc{KV cache}: per user, per token.
+        \item \textbf{Activations}: small at inference.
+        \item \textbf{Overhead}: $\approx$ 2\,GB.
+      \end{itemize}
+      \vspace{0.6em}
+      \uncover<2->{\small Llama-3-8B on a 24\,GB card. In fp16,
+      weights occupy 14.9\,GB and each 8k-context user adds 1\,GiB of
+      KV cache. Quantizing the weights to int4 frees 11.2\,GB for more
+      users.}
+    \end{column}
+  \end{columns}
 \end{frame}
-\note{\textbf{3:30.} Fragmentation gets a whole slide of its own later.
-PagedAttention exists to remove it.}
+\note{\textbf{3:30.} The three bars are the slide. Point at how the KV cache
+(red) grows from bar 1 to bar 2 while weights (blue) stay fixed. Then bar 3
+shows int4 shrinking the weights and freeing space.
+
+Llama-3-8B: 14.9 GB fp16 weights, 128 KiB per token KV, 8k context = 1 GiB
+per user. 7 users fills a 24 GB card in fp16. In int4 the same 7 users leave
+13.1 GB free.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{Weights $=$ parameters $\times$ bytes. 70B in fp16 is 140\,GB.}
@@ -463,8 +532,8 @@ is 4x cheaper.}
     \end{tabular}
   \end{center}
   \vspace{0.4em}
-  \emphc{vLLM or SGLang closes most of that 90\% gap with continuous
-  batching and PagedAttention.}
+  \emphc{vLLM reaches 40\% of the ceiling at batch 1 (4.3$\times$ faster
+  than \texttt{generate()}) with continuous batching and PagedAttention.}
 \end{frame}
 \note{\textbf{12:30.} Run this live. The 1.008 ratio earns their trust in the
 arithmetic. The 9.4\% earns you Movement 3. \texttt{generate()} is a
