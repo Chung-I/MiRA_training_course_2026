@@ -51,6 +51,7 @@
 \definecolor{good}{HTML}{15803D}
 \newcommand{\emphc}[1]{\textcolor{accent}{\textbf{#1}}}
 \newcommand{\warnc}[1]{\textcolor{warn}{\textbf{#1}}}
+\newcommand{\goodc}[1]{\textcolor{good}{\textbf{#1}}}
 
 % --- Badges ---------------------------------------------------------------
 \newcommand{\demo}[1]{%
@@ -783,6 +784,76 @@ checked, and 1.2.1 starts a PyTorch runtime by default. The older framing is
 still repeated everywhere online and is now out of date.}
 
 % -------------------------------------------------------------------------
+\begin{frame}{We measured all three. An engine is worth about 4$\times$.}
+  \small
+  Same RTX 5090, same Qwen2.5-0.5B in fp16, same 128 output tokens.
+  Total tok/s across all concurrent requests.
+  \vspace{0.4em}
+  \begin{center}
+    \begin{tabular}{rrrrr}
+      \toprule
+      \textbf{batch} & \textbf{HF \texttt{generate()}} & \textbf{vLLM} &
+      \textbf{SGLang} & \textbf{TRT-LLM} \\
+      \midrule
+      1  & 165   & \textbf{726}    & 701    & 613 \\
+      8  & 1,275 & \textbf{5,155}  & 4,977  & 3,674 \\
+      16 & 2,548 & \textbf{9,880}  & 9,625  & 5,446 \\
+      64 & 9,782 & \textbf{37,265} & 32,523 & 9,251 \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  \vspace{0.5em}
+  \begin{itemize}\small
+    \item \emphc{Not a batching artifact.} \texttt{generate()} batches fine and
+          all of them scale nearly linearly. The engines are simply
+          $\sim$4$\times$ faster \emph{per token}.
+    \item At batch 1, \texttt{generate()} reaches \textbf{9\%} of this model's
+          bandwidth ceiling. vLLM reaches \textbf{40\%}.
+    \item \textbf{Do not read a winner here.} On a 0.5\,B model this is dispatch
+          overhead, not architecture, and TRT-LLM is far outside its design
+          envelope.
+  \end{itemize}
+\end{frame}
+\note{\textbf{29:00.} Our own numbers, run two days ago. The 4$\times$ is the
+headline. Kill any "which is best" question fast: on a model this small you are
+measuring per-request overhead, not the engines.}
+
+% -------------------------------------------------------------------------
+\begin{frame}{The default that quietly costs you half your throughput}
+  Same SGLang, same machine, one setting changed.
+  \vspace{0.4em}
+  \begin{center}
+    \begin{tabular}{rrr}
+      \toprule
+      \textbf{batch} & \textbf{stock config} & \textbf{graphs raised to 64} \\
+      \midrule
+      16 & 9,680 & 9,625 \\
+      32 & \warnc{5,657} & \goodc{18,491} \\
+      64 & \warnc{11,152} & \goodc{32,523} \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  \vspace{0.6em}
+  SGLang captures decode CUDA graphs for
+  \texttt{bs = 1 2 4 8 12 16 24} and stops. Past 24 there is no graph, so it
+  falls back to eager. \texttt{cuda\_graph\_max\_bs\_decode} fixes it.
+  \vspace{0.5em}
+  \begin{center}
+    \begin{minipage}{0.93\textwidth}
+      \begin{alertblock}{The lesson, and it is the one to remember}
+        The missing CUDA toolkit announced itself with a stack trace. This one
+        produced a \textbf{plausible, quotable, completely wrong} throughput
+        curve. \emphc{Benchmark at the concurrency you will actually serve.}
+      \end{alertblock}
+    \end{minipage}
+  \end{center}
+\end{frame}
+\note{\textbf{30:30.} The best slide in this section. Measured only to 16 and the
+default looks fine; measured only at 32 and 64 and SGLang looks like the slow
+engine. Neither is true. A wrong number is more dangerous than a crash, because
+a crash stops you.}
+
+% -------------------------------------------------------------------------
 \begin{frame}{Start with vLLM. Move only for a reason.}
   \vspace{0.5em}
   \begin{center}
@@ -1104,6 +1175,73 @@ instead of this one if the room is quiet. Backup slides follow.}
 \note{Not shown unless asked. Cut order comes from the plan: Movement 3d
 first, then the tail of the toolbox. Movements 3b and 3c are never cut, because
 the named engines and the robot contrast are what this room will use.}
+
+% -------------------------------------------------------------------------
+\begin{frame}{Backup: none of the three ran from \texttt{pip} on a clean machine}
+  \small
+  All three install from \texttt{pip}. On an RTX 5090 with no CUDA toolkit,
+  \emphc{none of them served from that install}. All three ran in their official
+  containers.
+  \vspace{0.5em}
+  \begin{center}
+    \begin{tabular}{lll}
+      \toprule
+      & \textbf{what broke} & \textbf{why} \\
+      \midrule
+      vLLM    & \texttt{nvcc} not found        & DeepGEMM wants a toolkit \\
+              & \texttt{ninja} not found       & venv \texttt{bin} not on \texttt{PATH} \\
+              & compiler/header mismatch       & nvcc 13.3 vs CUDA 13.0 headers \\[0.4em]
+      SGLang  & FlashInfer JIT fails           & no \texttt{nvcc}; the wheel ships only \texttt{ptxas} \\[0.4em]
+      TRT-LLM & \texttt{libmpi.so.40} missing  & links against system OpenMPI \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  \vspace{0.6em}
+  Both engines wanted a compiler for \textbf{FP8 and JIT paths this fp16
+  benchmark never executes}.
+  \vspace{0.3em}
+  \begin{center}
+    \emphc{This is the argument for running them in their official containers.}
+  \end{center}
+\end{frame}
+\note{Backup only. Use if someone asks "is it really just pip install". The
+venv-bin-on-PATH one is the generalizable trap: it fails looking like a missing
+dependency when it is a PATH problem.}
+
+% -------------------------------------------------------------------------
+\begin{frame}{Backup: five TensorRT-LLM configs, none of them helped}
+  \small
+  The flat TRT-LLM curve was worth chasing. Resolved config first, guesses
+  second:
+  \texttt{max\_batch\_size}=2048 (nothing queued), CUDA graphs
+  \emph{already on} for \texttt{bs=[1..32,64,128]}, overlap scheduler already on.
+  \vspace{0.4em}
+  \begin{center}
+    \begin{tabular}{lrr}
+      \toprule
+      \textbf{config} & \textbf{batch 64} & \textbf{vs baseline} \\
+      \midrule
+      baseline                     & 9,291 & 100\% \\
+      FlashInfer attention         & 8,597 & \warnc{93\%} \\
+      \texttt{max\_num\_tokens}=32k & 9,318 & 100\% \\
+      chunked prefill              & 9,071 & 98\% \\
+      KV fraction 0.7              & 9,271 & 100\% \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  \vspace{0.5em}
+  What is left is not configurable: a 0.5\,B model emitting 128 tokens is
+  dominated by \textbf{per-request overhead}, not by the kernels TensorRT-LLM
+  optimizes.
+  \vspace{0.3em}
+  \begin{center}
+    \emphc{A benchmark outside a tool's design envelope measures the envelope,
+    not the tool.}
+  \end{center}
+\end{frame}
+\note{Backup. The honest negative result. Also the answer to "why is TRT-LLM
+last in your table" -- because we benchmarked it on the wrong thing, deliberately
+kept in to make that point.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{\cutbadge{1: cut this first} \; The layer below: Triton, and a training contrast}
