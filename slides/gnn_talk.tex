@@ -75,8 +75,8 @@
 \begin{frame}[plain]
   \titlepage
 \end{frame}
-\note{Last talk of an 8.5-hour day. Say the time promise immediately. Do not
-warm up. Target: finish at 17:48.
+\note{Last talk of an 8.5-hour day. Say the time promise in your first sentence.
+Skip the warm-up. Target: finish at 17:48.
 
 CHECKPOINT: 17:20 here.}
 
@@ -85,17 +85,17 @@ CHECKPOINT: 17:20 here.}
   \begin{enumerate}
     \setlength{\itemsep}{1.1em}
     \item Every node updates itself by \alert{summarizing its neighbors}.
-    \item \alert{Layers are hops.} Two or three is usually the right number.
-    \item The hard part is never the layer. It is deciding \alert{what the
-          nodes and the edges are}.
+    \item \alert{Layers are hops.} Start at two.
+    \item You will spend most of your time deciding \alert{what the nodes
+          and the edges are}.
   \end{enumerate}
   \vfill
   \begin{center}
-    \small\color{dim}No derivations. One equation. No spectral graph theory.
+    \small\color{dim}One equation, and no spectral graph theory.
   \end{center}
 \end{frame}
 \note{Say the promise out loud: "30 minutes, 3 ideas, I stop at 17:50."
-Then actually stop early. They will remember it.
+Then stop early.
 
 Do NOT define a graph yet. Four robot pictures first.}
 
@@ -143,8 +143,7 @@ Do NOT define a graph yet. Four robot pictures first.}
     \end{column}
   \end{columns}
 \end{frame}
-\note{One sentence, then move. The applications are the hook; the math is the
-payoff. Do not explain the architecture yet. That is the reveal on slide 7.}
+\note{One sentence, then move. Save the architecture for the reveal on slide 7.}
 
 % --- 4 -----------------------------------------------------------------
 \begin{frame}{A robot that pours and folds by predicting particles}
@@ -159,22 +158,22 @@ payoff. Do not explain the architecture yet. That is the reveal on slide 7.}
       Edges: \alert{contacts} (and rigid-group links).
     \end{column}
     \begin{column}{0.5\textwidth}
-      There is no mesh, no state vector, no fixed object count. Water is 3000
-      particles today and 5000 tomorrow, and the same network runs.
+      The input is a particle set of any size. Water is 3000 particles today
+      and 5000 tomorrow, and the same weights run.
     \end{column}
   \end{columns}
   \vfill
   \arx{1810.01566}
 \end{frame}
-\note{The "variable number of things" point is being planted here quietly, and
-it pays off on the flattening-fails slide.}
+\note{Plant the "variable number of things" point here. You cash it in on the
+flattening-fails slide.}
 
 % --- 5 -----------------------------------------------------------------
-\begin{frame}{A physics engine nobody wrote}
+\begin{frame}{A physics engine fit from data}
   \vspace{0.5em}
   \textbf{GNS} and \textbf{MeshGraphNets} simulate sand, water and cloth by
-  \alert{message passing on the mesh}, learned from data rather than written down
-  as equations.
+  \alert{message passing on the mesh}. The network fit the dynamics from
+  simulator rollouts.
   \vspace{1.0em}
 
   \begin{columns}[T]
@@ -184,7 +183,7 @@ it pays off on the flattening-fails slide.}
     \end{column}
     \begin{column}{0.5\textwidth}
       They \alert{generalize to more particles than they were trained on}.
-      Keep that fact. We come back to why.
+      Hold that fact until slide 19.
     \end{column}
   \end{columns}
   \vfill
@@ -197,8 +196,7 @@ invariance slide. Do not explain it yet.}
 \begin{frame}{A map a planner can reason over}
   \vspace{0.4em}
   \textbf{3D Dynamic Scene Graphs} turn a metric map into a graph of
-  \alert{places, objects and humans}: something a planner can query, not
-  just a point cloud.
+  \alert{places, objects and humans}, a structure a planner can query.
   \vspace{0.6em}
 
   \begin{center}
@@ -229,13 +227,13 @@ CHECKPOINT: 17:24 by the end of this slide.}
   \vspace{0.6em}
   \begin{center}
     \Large
-    Eight arms. Fluid particles. A cloth mesh. A building.\\[1.0em]
-    \alert{One layer type, repeated.}
+    Arms, particles, a cloth mesh, a building:\\[1.0em]
+    \alert{one layer type, repeated.}
   \end{center}
   \vfill
   \begin{center}
     \normalsize\color{dim}
-    Nothing above is a grid. Nothing above is a sequence.
+    None of these is a grid or a sequence.
   \end{center}
 \end{frame}
 \note{Pause here. Let it land before the wake-up question.}
@@ -262,11 +260,10 @@ CHECKPOINT: 17:24 by the end of this slide.}
     None of the four things I just showed you is either one.
   \end{center}}
 \end{frame}
-\note{This is the wake-up. Ask it, wait, take answers from the room. Costs 45
-seconds and buys you the next 25 minutes of attention.
+\note{Ask it, wait, take answers from the room. 45 seconds here keeps them awake
+for the next 25 minutes.
 
-If nobody answers, answer it yourself cheerfully and move on. Do not let
-silence stretch.}
+If nobody answers within five seconds, answer it yourself and move on.}
 
 % --- 9 -----------------------------------------------------------------
 \begin{frame}{Flattening fails: relabel the nodes and the answer changes}
@@ -289,12 +286,12 @@ silence stretch.}
     \end{tikzpicture}
   \end{center}
   \vspace{0.6em}
-  The MLP has to learn $n!$ copies of the same function. A GNN gets this
-  \alert{for free}, because summing over neighbors does not care about order.
+  The MLP has to learn $n!$ copies of the same function. A GNN sums over
+  neighbors, and a sum \alert{ignores order}.
 \end{frame}
-\note{Demo 1 in the notebook shows this numerically. If the room is dead at
-this point, switch to Colab NOW and run Demo 1 instead of talking. The
-MLP output visibly changes when the nodes are renumbered.}
+\note{Demo 1 in the notebook shows this numerically. If the room is dead,
+switch to Colab and run Demo 1 instead of talking. Renumber the nodes and
+the MLP output changes on screen.}
 
 % --- 10 ----------------------------------------------------------------
 \begin{frame}{Flattening fails: 8 objects today, 15 tomorrow}
@@ -312,7 +309,7 @@ MLP output visibly changes when the nodes are renumbered.}
   \end{itemize}
   \vfill
   \begin{center}\small\color{dim}
-    Padding and truncating is not a fix, it is a bug you have not hit yet.
+    Padding to a maximum count works until the day the count exceeds it.
   \end{center}
 \end{frame}
 \note{Fast slide. 40 seconds. The audience already believes this one.}
@@ -345,13 +342,12 @@ MLP output visibly changes when the nodes are renumbered.}
   \end{center}
   \vfill
   \begin{center}
-    Which particles touch, which arms can collide. \alert{Don't spend data
-    and compute learning what you already know}.
+    You already know which particles touch and which arms can collide.
+    \alert{Put that in the edges instead of paying data to learn it.}
   \end{center}
 \end{frame}
-\note{Pre-empt the smartest question in the room by asking it yourself. This
-buys you enormous credibility and it removes the one objection that would
-otherwise sit in someone's head for 20 minutes.
+\note{Ask the smartest question in the room before anyone else does. It removes
+the objection that would otherwise sit in someone's head for 20 minutes.
 
 CHECKPOINT: 17:28 by the end of this slide. Movement 3 starts now.}
 
@@ -394,10 +390,8 @@ CHECKPOINT: 17:28 by the end of this slide. Movement 3 starts now.}
     \item<3-> \alert{Update myself} with a small MLP. Then repeat $L$ times.
   \end{enumerate}
 \end{frame}
-\note{Say the sentence before any notation appears. This is the whole talk in
-one picture. Do not rush it, and do not add symbols yet.
-
-If they only remember one slide, it should be this one.}
+\note{Say the sentence before any notation appears. Do not rush this slide, and
+do not add symbols yet. If they remember one slide, make it this one.}
 
 % --- 13 ----------------------------------------------------------------
 \begin{frame}{The message-passing equation, in three clicks}
@@ -421,9 +415,9 @@ If they only remember one slide, it should be this one.}
       features, and \emph{what is on the edge between us}.}
     \only<2>{\alert{Combine all the messages.} Sum, mean or max: anything that
       ignores the order. This is where permutation invariance comes from.}
-    \only<3>{\alert{Update myself.} A small MLP on (me, the summary).
-      That is the entire layer.}
-    \only<4>{Stack $L$ of these. \alert{That is a GNN.} There is nothing else.}
+    \only<3>{\alert{Update myself.} A small MLP on (me, the summary)
+      completes one layer.}
+    \only<4>{Stack $L$ of these and \alert{you have a GNN.}}
   \end{center}
   \vspace{1.2em}
   \onslide<4->{\begin{center}\small\color{dim}
@@ -435,7 +429,7 @@ If they only remember one slide, it should be this one.}
 \note{This is the only equation in the talk. Read it left to right, out loud,
 one click at a time. Point at the coloured piece each time.
 
-Emphasise: $e_{uv}$ is the edge feature. In robotics that is usually the
+Emphasise: $e_{uv}$ is the edge feature. In robotics that is the
 relative pose, and that is a design decision worth more than the architecture.
 
 CHECKPOINT: 17:32 by the end of this slide.}
@@ -486,11 +480,11 @@ CHECKPOINT: 17:32 by the end of this slide.}
     Same picture as a CNN's receptive field. \alert{Layers are hops.}
   \end{center}}
 \end{frame}
-\note{Demo 3 in the notebook is exactly this: put a 1 on node 0, propagate,
+\note{Demo 3 in the notebook shows this: put a 1 on node 0, propagate,
 watch the non-zero set grow one hop per layer.
 
-The CNN analogy is the payoff: almost everyone in the room already has the
-CNN receptive-field picture, so hand them the mapping and stop.}
+Most of the room already has the CNN receptive-field picture. Hand them
+the mapping and stop.}
 
 % --- 15 ----------------------------------------------------------------
 \begin{frame}{GCN, GraphSAGE, GAT differ only in the AGG box}
@@ -501,7 +495,7 @@ CNN receptive-field picture, so hand them the mapping and stop.}
     \toprule
     & \textbf{AGG} & \textbf{Use it when} \\
     \midrule
-    \textbf{GCN}       & normalized mean & always. This is your baseline \\[0.5em]
+    \textbf{GCN}       & normalized mean & first. It is the baseline \\[0.5em]
     \textbf{GraphSAGE} & sample neighbors, then mean/max
                        & the graph is large, or new nodes\\
                        & & appear at test time \\[0.5em]
@@ -512,12 +506,11 @@ CNN receptive-field picture, so hand them the mapping and stop.}
   \end{center}
   \vfill
   \begin{center}\large
-    Three famous papers. \alert{One box changed.}
+    Three papers differ in \alert{one box}.
   \end{center}
 \end{frame}
-\note{Say the punchline out loud: they differ only in that one box. This is
-the slide that removes the fear of the literature: the alphabet soup of GNN
-variants is mostly this single choice.
+\note{Say it out loud: they differ in that one box. Most of the GNN alphabet
+soup is this single choice, and this slide removes the fear of the literature.
 
 Do not discuss expressiveness / the WL test. One sentence if asked.}
 
@@ -536,11 +529,11 @@ Do not discuss expressiveness / the WL test. One sentence if asked.}
   \end{itemize}
   \vfill
   \begin{center}\small\color{dim}
-    This is the slide that maps \emph{your} problem onto a GNN. Pick your row first.
+    Pick the row that fits \emph{your} problem before you pick an architecture.
   \end{center}
 \end{frame}
-\note{Ask them silently to place their own project in one of the three rows.
-Do not take answers, there is no time, but tell them to do it.}
+\note{Tell them to place their own project in one of the three rows. Do not take
+answers; there is no time.}
 
 % --- 17 ----------------------------------------------------------------
 \begin{frame}{You will spend 90\% of your time on graph construction}
@@ -614,23 +607,24 @@ Do not take answers, there is no time, but tell them to do it.}
       k-NN vs.\ radius vs.\ fully-connected. How many neighbors.
       \vspace{0.5em}
 
-      And in robotics: put the \alert{relative pose on the edge}. That buys
-      translation invariance for free, instead of paying for it in training data.
+      In robotics, put the \alert{relative pose on the edge}. Translation
+      invariance then comes from the input, and you stop paying for it in
+      augmentation.
     \end{column}
   \end{columns}
 \end{frame}
-\note{Numbers are measured, Demo 5 in the notebook (225 points).
+\note{Demo 5 in the notebook measured these numbers (225 points).
 
 Ask the room: which k is right? There is no answer without the task. Too small
 and the object falls apart into pieces; too large and everything touches
 everything and you have thrown the structure away.
 
-This is the slide that actually saves them time. Say so.
+This slide saves them time. Say so.
 
 CHECKPOINT: 17:37 by the end of this slide.}
 
 % --- 18 ----------------------------------------------------------------
-\begin{frame}{What the nodes and edges actually were}
+\begin{frame}{What the nodes and edges were}
   \vspace{-0.5em}
   \centering
   \scriptsize
@@ -666,10 +660,10 @@ CHECKPOINT: 17:37 by the end of this slide.}
   \vspace{0.5em}
 
   \footnotesize
-  \alert{This is the column you copy into your own project.}
+  \alert{Copy the Nodes and Edges columns into your own project.}
 \end{frame}
-\note{Do not read the table. Point at two rows: the DGCNN one (edges are
-recomputed in feature space, which surprises people) and whichever row is
+\note{Do not read the table. Point at two rows: the DGCNN one (DGCNN
+recomputes the edges in feature space, which surprises people) and whichever row is
 closest to the projects in this room.
 
 Tell them the slide will be on the repo, so they stop photographing it.}
@@ -684,18 +678,16 @@ Tell them the slide will be on the repo, so they stop photographing it.}
   \vspace{1.0em}
   \begin{itemize}
     \setlength{\itemsep}{0.8em}
-    \item So the \alert{number of layers is a bandwidth decision}, not a
-      hyperparameter. \arx{1912.06095}
-    \item And in physics and manipulation, the graph gives you the right
-      invariance for free: particles interact \alert{locally and identically},
-      which is exactly what a shared message function assumes.
-    \item That is why learned simulators generalize to \alert{more particles
-      than they were trained on}.
+    \item You choose the \alert{layer count from the radio budget}, and
+      validation loss has no say. \arx{1912.06095}
+    \item In physics and manipulation, particles interact \alert{locally and
+      identically}, which is what a shared message function assumes.
+    \item So learned simulators generalize to \alert{more particles than they
+      were trained on}.
   \end{itemize}
 \end{frame}
-\note{This is the "the inductive bias matches the physical system" slide,
-the cleanest example in the whole field. Both bullets generalize, so say them
-slowly.
+\note{The inductive bias matches the physical system here. Say both bullets
+slowly; both generalize beyond robotics.
 
 Cash in the promise made on the GNS slide.}
 
@@ -723,11 +715,11 @@ Cash in the promise made on the GNS slide.}
     \begin{column}{0.46\textwidth}
       \footnotesize
       After enough rounds of averaging with your neighbors, \alert{every node
-      in a connected graph holds the same vector}. That is over-smoothing, and
-      it is a property of the averaging, not of the task.
+      in a connected graph holds the same vector}. Over-smoothing comes from the
+      averaging itself, whatever the task.
       \vspace{0.5em}
 
-      \textbf{Two honest caveats:}
+      \textbf{Two caveats:}
       \begin{itemize}\setlength{\itemsep}{0.3em}
         \item The cliff mixes over-smoothing with the plain difficulty of
           \alert{training deep GCNs} without residual connections.
@@ -742,7 +734,7 @@ Cash in the promise made on the GNS slide.}
     The rule survives either explanation: \alert{start at 2}.
   \end{center}
 \end{frame}
-\note{Numbers measured, Demo 6 in the notebook.
+\note{Demo 6 in the notebook measured these.
 
 Read the distance column first: 5.6 at 5 layers, 0.10 at 6. The embeddings
 collapse, and the accuracy follows.
@@ -774,8 +766,7 @@ class GCN(nn.Module):
 \endgroup
 \vspace{-0.2em}
 \begin{center}
-  \small That is the whole model.
-  \alert{Everything hard happened on line 4}, where you chose the edges.
+  \small \alert{The hard decision sits on line 4}, where you chose the edges.
 \end{center}
 \end{frame}
 \note{Do not read the code. Point at line 4, \texttt{edge\_index}, and say that this
@@ -794,8 +785,8 @@ Library question: PyTorch Geometric. DGL if you need heterogeneous graphs.}
   \begin{columns}[T]
     \begin{column}{0.52\textwidth}
       \small
-      PyTorch and NumPy only. Message passing is written out by hand so you can
-      read every line. PyTorch Geometric appears once, at the end, optional.
+      PyTorch and NumPy only. I wrote message passing out by hand so you can
+      read every line. PyTorch Geometric appears once, at the end, as an option.
       \vspace{0.8em}
 
       \textbf{Right now, live:}
@@ -819,14 +810,14 @@ Library question: PyTorch Geometric. DGL if you need heterogeneous graphs.}
       \end{tabular}
 
       \vspace{0.8em}
-      \small\alert{The graph is the entire signal.}
+      \small\alert{The edges carry all of the signal.}
     \end{column}
   \end{columns}
 \end{frame}
 \note{*** SWITCH TO THE COLAB NOTEBOOK HERE. ***
 
-Run Demo 4 first: it is the strongest number in the talk: 51\% vs 91\% with
-features that are literally torch.randn. Then Demo 5 for the k-NN picture.
+Run Demo 4 first, the strongest number in the talk: 51\% vs 91\% with
+features drawn from torch.randn. Then Demo 5 for the k-NN picture.
 
 If the room is dead, run Demo 1 instead (the MLP output changes when you
 renumber the nodes). It is faster and more visual.
@@ -841,20 +832,19 @@ CHECKPOINT: back on slides by 17:44.}
   \vspace{1.0em}
   \begin{itemize}
     \setlength{\itemsep}{1.0em}
-    \item \textbf{Small and densely connected?} Just use a Transformer. It is
-      simpler, better tooled, and on a complete graph it is the same thing anyway.
-    \item \textbf{No real structure?} If you had to invent the edges to make it a
-      graph, you invented a prior. It may be wrong.
+    \item \textbf{Small and densely connected?} Use a Transformer. The tooling
+      is better, and on a complete graph it computes the same thing.
+    \item \textbf{No real structure?} If you invented the edges to make it a
+      graph, you invented a prior, and it may be wrong.
     \item \textbf{Your data is a grid or a sequence?} You already have the right
       architecture.
   \end{itemize}
   \vfill
   \begin{center}\large
-    GNNs win when the structure is \alert{sparse, known, and large}.
+    GNNs win when you \alert{know the sparse structure before training}.
   \end{center}
 \end{frame}
-\note{Never present a method as universally good. This slide is what makes the
-previous twenty minutes trustworthy.
+\note{This slide makes the previous twenty minutes trustworthy.
 
 Anticipated question: "are GNNs still relevant now that everything is a
 transformer?" Answer: RoboBallet is 2025, and the learned-simulator line is
@@ -875,8 +865,8 @@ learning it, especially with limited data.}
     \textbf{Two yeses} $\Rightarrow$ try a GNN.
   \end{center}
 \end{frame}
-\note{Slow down. This is the goal of the whole talk: that they can recognize
-when their own problem is a graph.
+\note{Slow down. The whole talk exists so they can recognize when their own
+problem is a graph.
 
 Give them five seconds of silence to run their own project through it.}
 
@@ -887,8 +877,8 @@ Give them five seconds of silence to run their own project through it.}
     \large
     A GNN is one idea repeated: \alert{every node updates itself by summarizing
     its neighbors.}\\[0.8em]
-    The hard part is never the layer. It is deciding \alert{what the nodes
-    and the edges are.}
+    You will spend most of your time deciding \alert{what the nodes and the
+    edges are.}
   \end{center}
   \vspace{1.1em}
   \hrule
@@ -905,10 +895,9 @@ Give them five seconds of silence to run their own project through it.}
       the framing in full
   \end{itemize}
 \end{frame}
-\note{Say the one-thing sentence one last time, word for word, exactly as on
-slide 2. Then the resources, fast.
+\note{Say the one-thing sentence one last time, word for word as on slide 2. Then the resources, fast.
 
-CHECKPOINT: 17:48. You promised 17:50. Finishing early is a gift.}
+CHECKPOINT: 17:48. You promised 17:50. Finish early.}
 
 % --- 26 ----------------------------------------------------------------
 \begin{frame}[plain]
