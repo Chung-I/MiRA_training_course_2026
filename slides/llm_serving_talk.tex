@@ -182,94 +182,132 @@ arrives in Movement 1.}
 % =========================================================================
 
 \begin{frame}{VRAM usage: weights, KV cache, activations, overhead}
-  \vspace{0.2em}
   \llmdiagWKV
-  \begin{columns}[c]
-    \begin{column}{0.55\textwidth}
-      \begin{center}
-        \begin{tikzpicture}[
-          font=\scriptsize,
-          bar/.style={minimum height=0.5cm, inner sep=0pt, anchor=south west,
-                      font=\tiny\bfseries},
-        ]
-        \def\totalW{8.0}  % bar width in cm for 24 GB
-        \def\scale{0.333}  % cm per GB
+  \vspace{-0.3em}
+  \small
+  \begin{center}
+    \begin{tabular}{@{}llll@{}}
+      \textbf{Weights}: fixed, paid once \quad &
+      \emphc{KV cache}: per user, per token \quad &
+      \textbf{Act.}: small \quad &
+      \textbf{OH}: $\approx$ 2\,GB
+    \end{tabular}
+  \end{center}
+  \vspace{0.3em}
+  \begin{center}
+    \begin{tikzpicture}[
+      font=\scriptsize,
+      bar/.style={minimum height=0.45cm, inner sep=0pt, anchor=south west,
+                  font=\tiny\bfseries},
+    ]
+    \def\scale{0.36}
+    % Bar 1: fp16, 2 users
+    \node[font=\tiny, anchor=east] at (-0.1, 0.22) {fp16, 2 users};
+    \node[bar, fill=accent!40, minimum width=14.9*\scale cm, text=black]
+      at (0, 0) {weights 14.9};
+    \node[bar, fill=warn!40, minimum width=2.0*\scale cm, text=black]
+      at (14.9*\scale, 0) {KV 2.0};
+    \node[bar, fill=black!15, minimum width=2.0*\scale cm, text=black]
+      at (17.0*\scale, 0) {OH 2};
+    \node[bar, fill=black!5, draw=black!20, minimum width=5.0*\scale cm,
+          text=black!50] at (19.0*\scale, 0) {free 5.0};
+    \draw[black!40] (24*\scale, -0.05) -- (24*\scale, 0.50);
+    \node[font=\tiny, black!50] at (24*\scale, 0.62) {24\,GB};
 
-        % --- Bar 1: fp16, 2 users (weights dominate) ---
-        \node[font=\tiny, anchor=east] at (-0.1, 0.25) {fp16, 2 users};
-        % weights: 14.9 GB
-        \node[bar, fill=accent!40, minimum width=14.9*\scale cm, text=black]
-          (w1) at (0, 0) {weights 14.9};
-        % KV: 2 users * 1 GiB = 2 GB
-        \node[bar, fill=warn!40, minimum width=2.0*\scale cm, text=black]
-          at (14.9*\scale, 0) {KV 2.0};
-        % activations: ~0.1
-        \node[bar, fill=good!30, minimum width=0.1*\scale cm]
-          at (16.9*\scale, 0) {};
-        % overhead: 2 GB
-        \node[bar, fill=black!15, minimum width=2.0*\scale cm, text=black]
-          at (17.0*\scale, 0) {OH 2};
-        % free
-        \node[bar, fill=black!5, draw=black!20, minimum width=5.0*\scale cm,
-              text=black!50] at (19.0*\scale, 0) {free 5.0};
-        % 24 GB marker
-        \draw[black!40] (24*\scale, -0.05) -- (24*\scale, 0.55);
-        \node[font=\tiny, black!50] at (24*\scale, 0.7) {24\,GB};
+    % Bar 2: fp16, 7 users
+    \node[font=\tiny, anchor=east] at (-0.1, -0.68) {fp16, 7 users};
+    \node[bar, fill=accent!40, minimum width=14.9*\scale cm, text=black]
+      at (0, -0.9) {weights 14.9};
+    \node[bar, fill=warn!40, minimum width=5.1*\scale cm, text=black]
+      at (14.9*\scale, -0.9) {\alert{KV 5.1}};
+    \node[bar, fill=black!15, minimum width=2.0*\scale cm, text=black]
+      at (20.1*\scale, -0.9) {OH 2};
+    \node[bar, fill=black!5, draw=black!20, minimum width=1.9*\scale cm,
+          text=black!50] at (22.1*\scale, -0.9) {\tiny 1.9};
+    \draw[black!40] (24*\scale, -0.95) -- (24*\scale, -0.40);
 
-        % --- Bar 2: fp16, 7 users (KV fills the card) ---
-        \node[font=\tiny, anchor=east] at (-0.1, -0.75) {fp16, 7 users};
-        \node[bar, fill=accent!40, minimum width=14.9*\scale cm, text=black]
-          at (0, -1.0) {weights 14.9};
-        \node[bar, fill=warn!40, minimum width=5.1*\scale cm, text=black]
-          at (14.9*\scale, -1.0) {\alert{KV 5.1}};
-        \node[bar, fill=good!30, minimum width=0.1*\scale cm]
-          at (20.0*\scale, -1.0) {};
-        \node[bar, fill=black!15, minimum width=2.0*\scale cm, text=black]
-          at (20.1*\scale, -1.0) {OH 2};
-        \node[bar, fill=black!5, draw=black!20, minimum width=1.9*\scale cm,
-              text=black!50] at (22.1*\scale, -1.0) {\tiny 1.9};
-        \draw[black!40] (24*\scale, -1.05) -- (24*\scale, -0.45);
-
-        % --- Bar 3: int4, 7 users (weights shrunk) ---
-        \node[font=\tiny, anchor=east] at (-0.1, -1.75) {int4, 7 users};
-        \node[bar, fill=accent!25, minimum width=3.7*\scale cm, text=black]
-          at (0, -2.0) {w 3.7};
-        \node[bar, fill=warn!40, minimum width=5.1*\scale cm, text=black]
-          at (3.7*\scale, -2.0) {KV 5.1};
-        \node[bar, fill=good!30, minimum width=0.1*\scale cm]
-          at (8.8*\scale, -2.0) {};
-        \node[bar, fill=black!15, minimum width=2.0*\scale cm, text=black]
-          at (8.9*\scale, -2.0) {OH 2};
-        \node[bar, fill=black!5, draw=black!20, minimum width=13.1*\scale cm,
-              text=black!50] at (10.9*\scale, -2.0) {free 13.1};
-        \draw[black!40] (24*\scale, -2.05) -- (24*\scale, -1.45);
-
-        \end{tikzpicture}
-      \end{center}
-    \end{column}
-    \begin{column}{0.42\textwidth}
-      \small
-      \begin{itemize}\setlength{\itemsep}{0.5em}
-        \item \textbf{Weights}: fixed, paid once.
-        \item \emphc{KV cache}: per user, per token.
-        \item \textbf{Activations}: small at inference.
-        \item \textbf{Overhead}: $\approx$ 2\,GB.
-      \end{itemize}
-      \vspace{0.6em}
-      \uncover<2->{\small Llama-3-8B on a 24\,GB card. In fp16,
-      weights occupy 14.9\,GB and each 8k-context user adds 1\,GiB of
-      KV cache. Quantizing the weights to int4 frees 11.2\,GB for more
-      users.}
-    \end{column}
-  \end{columns}
+    % Bar 3: int4, 7 users
+    \node[font=\tiny, anchor=east] at (-0.1, -1.58) {int4, 7 users};
+    \node[bar, fill=accent!25, minimum width=3.7*\scale cm, text=black]
+      at (0, -1.8) {w 3.7};
+    \node[bar, fill=warn!40, minimum width=5.1*\scale cm, text=black]
+      at (3.7*\scale, -1.8) {KV 5.1};
+    \node[bar, fill=black!15, minimum width=2.0*\scale cm, text=black]
+      at (8.9*\scale, -1.8) {OH 2};
+    \node[bar, fill=black!5, draw=black!20, minimum width=13.1*\scale cm,
+          text=black!50] at (10.9*\scale, -1.8) {free 13.1};
+    \draw[black!40] (24*\scale, -1.85) -- (24*\scale, -1.30);
+    \end{tikzpicture}
+  \end{center}
+  \vspace{0.2em}
+  \begin{center}\small
+    Llama-3-8B on a 24\,GB card. Each 8k-context user adds 1\,GiB of KV
+    cache. Quantizing weights from fp16 to int4 frees 11.2\,GB.
+  \end{center}
 \end{frame}
-\note{\textbf{3:30.} The three bars are the slide. Point at how the KV cache
-(red) grows from bar 1 to bar 2 while weights (blue) stay fixed. Then bar 3
-shows int4 shrinking the weights and freeing space.
+\note{\textbf{3:30.} Point at how the KV cache (orange) grows from bar 1 to
+bar 2 while weights (blue) stay fixed. Then bar 3 shows int4 shrinking the
+weights and freeing space.}
 
-Llama-3-8B: 14.9 GB fp16 weights, 128 KiB per token KV, 8k context = 1 GiB
-per user. 7 users fills a 24 GB card in fp16. In int4 the same 7 users leave
-13.1 GB free.}
+% -------------------------------------------------------------------------
+\begin{frame}{GPU memory hierarchy: HBM, L2 cache, SRAM}
+  \vspace{0.2em}
+  \begin{center}
+    \begin{tikzpicture}[
+      font=\scriptsize,
+      lvl/.style={rectangle, rounded corners=2pt, minimum height=0.55cm,
+                  inner xsep=4pt, inner ysep=2pt, font=\scriptsize},
+      ar/.style={-{Latex[length=1.5mm]}, black!35, thick},
+    ]
+    % SRAM (registers + shared memory)
+    \node[lvl, draw=good!60, fill=good!12, minimum width=3.0cm] (sram)
+      at (0, 2.0) {\textbf{SRAM} (registers + shared mem)};
+    \node[font=\tiny, black!55, align=left, anchor=west] at (2.2, 2.0)
+      {$\sim$20\,MB \quad $\sim$19\,TB/s \quad on-chip};
+
+    % L2 cache
+    \node[lvl, draw=accent!60, fill=accent!10, minimum width=4.0cm] (l2)
+      at (0, 1.0) {\textbf{L2 cache}};
+    \node[font=\tiny, black!55, align=left, anchor=west] at (2.7, 1.0)
+      {$\sim$50\,MB \quad $\sim$6\,TB/s \quad on-chip};
+
+    % HBM (VRAM)
+    \node[lvl, draw=warn!60, fill=warn!10, minimum width=6.0cm] (hbm)
+      at (0, 0) {\textbf{HBM / VRAM}};
+    \node[font=\tiny, black!55, align=left, anchor=west] at (3.7, 0)
+      {24--80\,GB \quad 1--3\,TB/s \quad off-chip};
+
+    % Host RAM
+    \node[lvl, draw=black!30, fill=black!5, minimum width=8.0cm] (host)
+      at (0, -1.0) {\textbf{Host RAM (CPU)}};
+    \node[font=\tiny, black!55, align=left, anchor=west] at (4.7, -1.0)
+      {64--512\,GB \quad $\sim$50\,GB/s via PCIe};
+
+    \draw[ar] (sram) -- (l2);
+    \draw[ar] (l2) -- (hbm);
+    \draw[ar] (hbm) -- (host);
+
+    % Labels
+    \node[font=\tiny, black!40, anchor=east] at (-4.5, 2.0) {fast, small};
+    \node[font=\tiny, black!40, anchor=east] at (-4.5, -1.0) {slow, large};
+    \draw[-{Latex[length=1.5mm]}, black!25] (-4.5, 1.7) -- (-4.5, -0.7);
+    \end{tikzpicture}
+  \end{center}
+  \vspace{0.3em}
+  \small
+  An 8B model in fp16 occupies 16\,GB. The L2 cache holds $\sim$50\,MB.
+  Each decode step reads all 16\,GB of weights from HBM because the weights
+  do not fit in any faster level. Decode speed $=$ HBM bandwidth $\div$
+  weight bytes.
+\end{frame}
+\note{The hierarchy explains why decode is bandwidth-bound: the weights are
+300$\times$ larger than the L2 cache, so every token pays the full HBM read.
+Batching amortizes this read across multiple users. Quantization shrinks the
+weights so each read moves fewer bytes. Kernel fusion reduces the number of
+round-trips by combining operations in SRAM.
+
+RTX 5090: 32 GB GDDR7, 1.79 TB/s. A100 80GB: 80 GB HBM2e, 2.0 TB/s.
+H100 80GB: 80 GB HBM3, 3.35 TB/s. These are spec-sheet peaks.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{Prefill is compute-bound. Decode is bandwidth-bound.}
