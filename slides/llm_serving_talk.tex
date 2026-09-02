@@ -826,9 +826,40 @@ with the same system prompt point at the same physical blocks.}
     \end{minipage}
   \end{center}
 \end{frame}
-\note{\textbf{21:30.} Do not survey quantization algorithms. Name AWQ, GPTQ and
-FP8, give the rule, and continue. If someone asks which one, answer: the one
-that your engine supports for your card.}
+\note{\textbf{21:30.} Name AWQ, GPTQ and FP8, give the rule, and continue.
+If someone asks which one, answer: the one that your engine supports for your
+card. The next slide has the details for the curious.}
+
+% -------------------------------------------------------------------------
+\begin{frame}{AWQ, GPTQ, NVFP4: three ways to shrink the weights}
+  \hfill\llmdiagW
+  \vspace{-0.2em}
+  \small
+  \begin{itemize}\setlength{\itemsep}{0.6em}
+    \item \textbf{GPTQ} (Frantar et al., ICLR 2023) quantizes weights one
+          column at a time using an approximate second-order method. Each
+          column is rounded, and the rounding error is compensated by
+          adjusting all remaining columns via the inverse Hessian. A
+          calibration set of $\sim$128 examples computes the Hessian.
+          GPTQ runs in minutes on one GPU.
+    \item \textbf{AWQ} (Lin et al., MLSys 2024) observes that $\sim$1\% of
+          weights process large-magnitude activations and matter
+          disproportionately. AWQ applies per-channel scaling before
+          quantization: it multiplies important weight channels by a scale
+          factor and divides the activations by the same factor, shifting
+          the quantization grid to protect those weights.
+    \item \textbf{NVFP4} stores each weight in 4 bits of floating-point
+          (1 sign, 2 exponent, 1 mantissa). A block of 16 values shares
+          an E4M3 scale factor, and the tensor has a global FP32 scale.
+          Requires Blackwell fifth-generation Tensor Cores.
+  \end{itemize}
+\end{frame}
+\note{This slide is for the audience member who asks ``what does AWQ actually
+do?'' The key difference: GPTQ compensates rounding error through the Hessian.
+AWQ protects salient weights by rescaling before quantization. NVFP4 uses a
+hardware-native 4-bit float format with fine-grained block scaling.
+
+arXiv:2210.17323 (GPTQ), arXiv:2306.00978 (AWQ).}
 
 % -------------------------------------------------------------------------
 \begin{frame}{\#4 Prefix caching is free, and it is the biggest RAG win}
@@ -891,31 +922,61 @@ find later. Do not read the list.}
 % -------------------------------------------------------------------------
 \begin{frame}{The SGLang trick is RadixAttention: longest-prefix match}
   \hfill\llmdiagKV
-  \textbf{RadixAttention has the same goal as prefix caching, with a different
-  data structure.}
-  \vspace{0.6em}
-  \begin{center}
-    \begin{tabular}{ll}
-      \toprule
-      vLLM & hash lookup: exact block match, or nothing \\
-      \emphc{SGLang} & \emphc{radix tree of token spans: longest-prefix match} \\
-      \bottomrule
-    \end{tabular}
-  \end{center}
-  \vspace{1.0em}
-  \begin{itemize}
-    \item A tree of \emph{spans} finds the longest shared prefix between a new
-          request and everything already cached.
-    \item That structure also makes the cache \textbf{tierable}:
-          you can evict a subtree instead of a guess about blocks.
-  \end{itemize}
-  \vspace{0.5em}
-  \emphc{If your workload is many requests that share long, varied prefixes
-  (agents, tool calls, few-shot prompts), this is the difference.}
+  \vspace{-0.6em}
+  \begin{columns}[c]
+    \begin{column}{0.48\textwidth}
+      \centering
+      \begin{tikzpicture}[
+        font=\tiny,
+        nd/.style={circle, draw=black!40, fill=black!5, minimum size=3.5mm,
+                   inner sep=0pt},
+        hit/.style={nd, draw=accent, fill=accent!20},
+        new/.style={nd, draw=good, fill=good!20},
+        evict/.style={nd, draw=warn, fill=warn!15, dashed},
+        edg/.style={-{Latex[length=1mm]}, black!40, thick},
+        lab/.style={font=\tiny, midway, above, black!60},
+      ]
+      \node[nd] (root) at (0, 0) {};
+      \node[font=\tiny, black!50, left=1mm of root] {root};
+      % Branch 1: system prompt (cache hit)
+      \node[hit] (a1) at (1.5, 0.8) {};
+      \node[hit] (a2) at (3.0, 1.2) {};
+      \node[new] (a3) at (4.5, 1.2) {};
+      \draw[edg, accent] (root)--(a1) node[lab] {sys prompt};
+      \draw[edg, accent] (a1)--(a2) node[lab] {doc A};
+      \draw[edg, good] (a2)--(a3) node[lab, good!60] {new query};
+      % Branch 2: same system prompt, different doc
+      \node[hit] (b1) at (3.0, 0.0) {};
+      \draw[edg, accent] (a1)--(b1) node[lab, below] {doc B};
+      % Branch 3: evicted
+      \node[evict] (c1) at (1.5, -0.8) {};
+      \draw[edg, warn, dashed] (root)--(c1) node[lab, below] {old prefix};
+      % Legend
+      \node[font=\tiny, align=left, black!55] at (2.3, -1.6)
+        {\textcolor{accent}{$\bullet$} cache hit \quad
+         \textcolor{good}{$\bullet$} new \quad
+         \textcolor{warn}{$\bullet$} evicted (LRU)};
+      \end{tikzpicture}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \small
+      \begin{itemize}\setlength{\itemsep}{0.4em}
+        \item Each \textbf{edge} stores a token span and its KV cache pages.
+              Each \textbf{node} is a branch point where cached prompts diverge.
+        \item A new request walks from the root and finds the
+              \alert{longest shared prefix}, reusing its KV pages.
+        \item vLLM hashes fixed-size blocks: exact match or nothing.
+              A radix tree matches \alert{partial overlaps of any length}.
+        \item Eviction removes the \textbf{least-recently-used leaf}.
+      \end{itemize}
+    \end{column}
+  \end{columns}
 \end{frame}
-\note{\textbf{25:00.} The distinction that matters: a hash needs an exact prefix match at a
-block boundary. A radix tree finds partial overlap. Agent
-traffic is mostly partial overlap.}
+\note{\textbf{25:00.} The diagram is from the SGLang blog (lmsys.org, Jan 2024,
+Figure 4). Blue = cache hit (reused KV pages), green = new tokens, dashed
+orange = evicted. Point at the branch point after ``sys prompt'': two
+different documents share the same system-prompt KV pages. A hash-based cache
+misses this if the documents start at different block boundaries.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{The tree buys tiering, constrained decoding and PD split}
@@ -1464,49 +1525,146 @@ NVFP4 keeps a floating-point scale on a 16-value block.
 Source: NVIDIA developer blog, ``Introducing NVFP4''.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{\cutbadge{1: cut this first} \; The layer below: Triton, and a training contrast}
-  \vspace{0.4em}
-  \begin{itemize}
-    \item \textbf{Triton} is a Python DSL for GPU kernels. You write
-          tile-level code. The compiler handles coalescing, shared memory and
-          layout. People now write custom kernels in Triton instead of raw CUDA,
-          and it appears \emph{inside} each stack in this talk.
-    \item \textbf{Liger-Kernel} is a set of fused Triton kernels (RMSNorm, RoPE,
-          SwiGLU, fused linear cross-entropy). It claims $+20\%$ throughput and
-          $-60\%$ memory.
+\begin{frame}{\cutbadge{1: cut this first} \; Kernel fusion: why fused kernels are faster}
+  \hfill\llmdiagK
+  \vspace{-0.4em}
+  \begin{center}
+    \begin{tikzpicture}[
+      font=\tiny,
+      op/.style={rectangle, draw=black!40, fill=black!5, rounded corners=1pt,
+                 minimum width=1.0cm, minimum height=0.35cm, inner sep=1pt},
+      hbm/.style={rectangle, draw=warn!60, fill=warn!10, rounded corners=1pt,
+                  minimum width=5.5cm, minimum height=0.35cm, inner sep=1pt,
+                  font=\tiny\bfseries},
+      ar/.style={-{Latex[length=0.8mm]}, black!30},
+    ]
+    % Unfused: N round-trips
+    \node[font=\tiny\bfseries, black!60] at (-1.8, 1.0) {unfused};
+    \node[hbm] (hbm1) at (1.5, 1.5) {HBM};
+    \node[op] (r1) at (-0.3, 1.0) {RMSNorm};
+    \node[op] (r2) at (1.0, 1.0) {RoPE};
+    \node[op] (r3) at (2.3, 1.0) {SwiGLU};
+    \node[op] (r4) at (3.5, 1.0) {Quant};
+    \foreach \n in {r1,r2,r3,r4} {
+      \draw[ar, warn] (\n.north) -- ++(0,0.25);
+      \draw[ar, warn] (\n.north) ++(0.15,0.25) -- ++(0,-0.25);
+    }
+    \node[font=\tiny, warn, align=center] at (5.2, 1.25) {$4\times$\\read+write};
 
-          \vspace{0.3em}
-          \warnc{Liger-Kernel is for training, not serving.} It is the same
-          technique applied to the other half of the lifecycle.
-  \end{itemize}
+    % Fused: 1 round-trip
+    \node[font=\tiny\bfseries, black!60] at (-1.8, -0.1) {fused};
+    \node[hbm] (hbm2) at (1.5, 0.4) {HBM};
+    \node[op, draw=good, fill=good!10, minimum width=4.6cm] (fused)
+      at (1.5, -0.1) {RMSNorm + RoPE + SwiGLU + Quant};
+    \draw[ar, good] (fused.north) -- ++(0,0.25);
+    \draw[ar, good] (fused.north) ++(0.15,0.25) -- ++(0,-0.25);
+    \node[font=\tiny, good!60, align=center] at (5.2, 0.15) {$1\times$\\read+write};
+    \end{tikzpicture}
+  \end{center}
+  \vspace{0.2em}
+  \scriptsize
+  \begin{center}
+    \begin{tabular}{@{}llp{6.5cm}@{}}
+      \toprule
+      & \textbf{approach} & \textbf{how it fuses} \\
+      \midrule
+      \textbf{FlashAttention} & hand-written CUDA
+        & fuses Q$\cdot$K$^T$ $\rightarrow$ softmax $\rightarrow$ $\times$V
+          in SRAM tiles, avoids materializing the $O(N^2)$ attention matrix \\
+      \textbf{Triton} & Python DSL
+        & tile-level GPU code, compiler handles memory staging \\
+      \textbf{torch.compile} & automatic
+        & traces PyTorch, applies fusion passes, emits Triton kernels \\
+      \textbf{JAX XLA} & automatic
+        & HLO fusion passes over the computation graph \\
+      \textbf{TensorRT} & offline
+        & graph-level layer fusion + per-GPU GEMM auto-tuning \\
+      \textbf{FlashRT} & hand-written + CUDA graph
+        & fused memory-bound ops, delegates GEMM to cuBLAS \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
 \end{frame}
-\note{This whole frame is Movement 3d. If the talk runs long, remove this
-frame first. One optional slide, and the first to cut. If you are past 30 minutes
-when you reach Movement 3c, skip this.}
+\note{The single principle: a chain of N unfused kernels does N HBM
+round-trips. A fused kernel reads HBM once and writes once, cutting memory
+traffic by up to N$\times$. The spectrum runs from fully manual (FlashAttention,
+FlashRT) to fully automatic (torch.compile, XLA), with Triton and TensorRT in
+between. Manual fusion achieves the highest efficiency but requires GPU
+programming expertise.
+
+Liger-Kernel applies the same technique to training (fused RMSNorm + SwiGLU),
+claiming +20\% throughput and $-$60\% memory.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{\cutbadge{2: trim next} \; \#5 Speculative decoding: 2$\times$, and the same output}
-  \begin{itemize}
-    \item A \textbf{small draft model} proposes $k$ tokens.
-    \item The \textbf{big model verifies all $k$ in a single forward pass}.
-    \item The model keeps the accepted tokens. The first rejection restarts from there.
-  \end{itemize}
-  \vspace{0.8em}
+  \hfill\llmdiagK
+  \vspace{-0.4em}
   \begin{center}
-    \begin{minipage}{0.9\textwidth}
-      \begin{block}{Why it works, a callback to Movement 2}
-        You are \emph{bandwidth-bound}, so you have \emph{spare compute}.
-        Verification of $k$ tokens costs about the weight traffic of one
-        token. You buy speed with compute that you did not use.
-      \end{block}
-    \end{minipage}
+    \begin{tikzpicture}[
+      font=\scriptsize,
+      tok/.style={rectangle, draw=black!40, fill=black!5, rounded corners=1pt,
+                  minimum width=0.7cm, minimum height=0.45cm, inner sep=1pt},
+      acc/.style={tok, draw=good, fill=good!15},
+      rej/.style={tok, draw=warn, fill=warn!15},
+      draft/.style={tok, draw=accent!50, fill=accent!8},
+      ar/.style={-{Latex[length=1.2mm]}, black!35},
+    ]
+    % Draft phase
+    \node[font=\tiny\bfseries, black!60] at (-1.2, 0.8) {draft model};
+    \foreach \i/\t in {0/The, 1/cat, 2/sat, 3/on, 4/a}
+      \node[draft] (d\i) at (\i*1.0, 0.8) {\t};
+    \foreach \i in {0,...,3}
+      \pgfmathtruncatemacro{\j}{\i+1}
+      \draw[ar, accent!50] (d\i)--(d\j);
+
+    % Verify phase
+    \node[font=\tiny\bfseries, black!60] at (-1.2, 0) {big model};
+    \node[font=\tiny, black!40] at (-1.2, -0.35) {(1 forward pass)};
+    \node[acc] (v0) at (0, 0) {The};
+    \node[acc] (v1) at (1.0, 0) {cat};
+    \node[acc] (v2) at (2.0, 0) {sat};
+    \node[rej] (v3) at (3.0, 0) {\color{warn}on};
+    \node[font=\tiny, warn] at (3.0, -0.45) {reject};
+    \node[acc] (v3c) at (4.0, 0) {upon};
+    \node[font=\tiny, good!60] at (4.0, -0.45) {correct};
+
+    % Arrows down from draft to verify
+    \foreach \i in {0,...,3}
+      \draw[ar] (d\i)--(v\i);
+    \end{tikzpicture}
   \end{center}
-  \vspace{0.6em}
-  Usually 1.5--3$\times$ faster, with an \emphc{identical output
-  distribution}.
+  \vspace{0.2em}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      \small
+      \textbf{Why it works:} decode is bandwidth-bound, so the GPU has spare
+      compute. Verifying $k$ draft tokens reads the weights \textbf{once}
+      (same bandwidth as 1 token) but uses $k\times$ the arithmetic.
+    \end{column}
+    \begin{column}{0.44\textwidth}
+      \small
+      \textbf{Why n-gram drafts work:} the acceptance rate only needs to
+      exceed $1/k$ to break even. Natural language has enough local
+      repetition (articles, prepositions, closing brackets) that even a
+      simple n-gram model achieves 50--70\% acceptance.
+    \end{column}
+  \end{columns}
+  \vspace{0.3em}
+  \begin{center}\small
+    Modified rejection sampling preserves the \emphc{exact target distribution}.
+  \end{center}
 \end{frame}
-\note{The identical distribution sets it apart from the other tricks: there
-is a proof of zero quality loss. If you have 30 seconds, use them here.}
+\note{The diagram shows 5 draft tokens verified in one forward pass. Three
+accepted (green), one rejected (orange ``on'' replaced by ``upon''), and the
+correction token sampled from the residual distribution. The key insight: the
+big model reads its weights once for all 5 tokens, so the bandwidth cost is
+1 token while producing up to 5. An n-gram draft model works because even
+50\% acceptance at $k=5$ gives 2.5 tokens per weight read.
+
+The identical-distribution guarantee comes from modified rejection sampling:
+accept if $p_\text{target} \geq p_\text{draft}$, otherwise accept with
+probability $p_\text{target}/p_\text{draft}$ and sample a correction from
+the residual. Leviathan et al., arXiv:2302.01318.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{\cutbadge{2: trim next} \; Multi-Token Prediction trains the draft head into the model}
