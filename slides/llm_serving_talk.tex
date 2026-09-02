@@ -83,13 +83,10 @@
   \draw[llmar] (PF)--(KV); \draw[llmar] (KV)--(DC);
   \draw[llmar] (WP)--(PF); \draw[llmar] (WD)--(DC);
 }
-% Helper: place a tikzpicture at top-right corner of the slide
-\newcommand{\llmoverlay}[1]{%
-  \begin{tikzpicture}[remember picture, overlay]
-    \node[anchor=north east, inner sep=0pt] at
-      ([xshift=-3mm, yshift=-1mm]current page.north east) {#1};
-  \end{tikzpicture}%
-}
+% Helper: place a tikzpicture at top-right corner of the slide.
+% To show the mini-diagrams, swap the two lines below.
+\newcommand{\llmoverlay}[1]{}  % hidden
+%\newcommand{\llmoverlay}[1]{\begin{tikzpicture}[remember picture, overlay]\node[anchor=north east, inner sep=0pt] at ([xshift=-3mm, yshift=-1mm]current page.north east) {#1};\end{tikzpicture}}
 \newcommand{\llmdiagW}{\llmoverlay{\begin{tikzpicture}[scale=0.65]\llmbase
   \node[llmbox, llmhl] at (0,-0.45) {Weights};
   \node[llmbox, llmhl] at (1.95,-0.45) {Weights};\end{tikzpicture}}}
@@ -674,11 +671,8 @@ End of Movement 2. Target: 18 minutes.}
     \item \emphc{Cache the prefix.} Shared system prompt or retrieved
           documents: prefill once, reuse.
     \item Speculative decoding. 1.5--3$\times$, identical output distribution.
-          \hfill\cutbadge{2: appendix}
     \item A smaller model, or one base $+$ many LoRA adapters.
-          \hfill\cutbadge{2: appendix}
     \item More GPUs. \emph{Last.}
-          \hfill\cutbadge{2: appendix}
   \end{enumerate}
 \end{frame}
 \note{\textbf{18:00.} If you are behind schedule, this frame alone carries
@@ -1137,6 +1131,191 @@ a crash stops you.}
 \note{\textbf{28:00.} Be decisive. They came for a recommendation. End of Movement 3b.}
 
 % =========================================================================
+
+% =========================================================================
+\section{Acceleration techniques}
+% =========================================================================
+
+% -------------------------------------------------------------------------
+\begin{frame}{Kernel fusion: why fused kernels are faster}
+  \llmdiagK
+  \vspace{-0.4em}
+  \begin{center}
+    \begin{tikzpicture}[
+      font=\tiny,
+      op/.style={rectangle, draw=black!40, fill=black!5, rounded corners=1pt,
+                 minimum width=1.0cm, minimum height=0.35cm, inner sep=1pt},
+      hbm/.style={rectangle, draw=warn!60, fill=warn!10, rounded corners=1pt,
+                  minimum width=5.5cm, minimum height=0.35cm, inner sep=1pt,
+                  font=\tiny\bfseries},
+      ar/.style={-{Latex[length=0.8mm]}, black!30},
+    ]
+    % Unfused: N round-trips
+    \node[font=\tiny\bfseries, black!60] at (-1.8, 1.0) {unfused};
+    \node[hbm] (hbm1) at (1.5, 1.5) {HBM};
+    \node[op] (r1) at (-0.3, 1.0) {RMSNorm};
+    \node[op] (r2) at (1.0, 1.0) {RoPE};
+    \node[op] (r3) at (2.3, 1.0) {SwiGLU};
+    \node[op] (r4) at (3.5, 1.0) {Quant};
+    \foreach \n in {r1,r2,r3,r4} {
+      \draw[ar, warn] (\n.north) -- ++(0,0.25);
+      \draw[ar, warn] (\n.north) ++(0.15,0.25) -- ++(0,-0.25);
+    }
+    \node[font=\tiny, warn, align=center] at (5.2, 1.25) {$4\times$\\read+write};
+
+    % Fused: 1 round-trip
+    \node[font=\tiny\bfseries, black!60] at (-1.8, -0.1) {fused};
+    \node[hbm] (hbm2) at (1.5, 0.4) {HBM};
+    \node[op, draw=good, fill=good!10, minimum width=4.6cm] (fused)
+      at (1.5, -0.1) {RMSNorm + RoPE + SwiGLU + Quant};
+    \draw[ar, good] (fused.north) -- ++(0,0.25);
+    \draw[ar, good] (fused.north) ++(0.15,0.25) -- ++(0,-0.25);
+    \node[font=\tiny, good!60, align=center] at (5.2, 0.15) {$1\times$\\read+write};
+    \end{tikzpicture}
+  \end{center}
+  \vspace{0.2em}
+  \scriptsize
+  \begin{center}
+    \begin{tabular}{@{}llp{6.5cm}@{}}
+      \toprule
+      & \textbf{approach} & \textbf{how it fuses} \\
+      \midrule
+      \textbf{FlashAttention} & hand-written CUDA
+        & fuses Q$\cdot$K$^T$ $\rightarrow$ softmax $\rightarrow$ $\times$V
+          in SRAM tiles, avoids materializing the $O(N^2)$ attention matrix \\
+      \textbf{Triton} & Python DSL
+        & tile-level GPU code, compiler handles memory staging \\
+      \textbf{torch.compile} & automatic
+        & traces PyTorch, applies fusion passes, emits Triton kernels \\
+      \textbf{JAX XLA} & automatic
+        & HLO fusion passes over the computation graph \\
+      \textbf{TensorRT} & offline
+        & graph-level layer fusion + per-GPU GEMM auto-tuning \\
+      \textbf{FlashRT} & hand-written + CUDA graph
+        & fused memory-bound ops, delegates GEMM to cuBLAS \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+\end{frame}
+\note{The single principle: a chain of N unfused kernels does N HBM
+round-trips. A fused kernel reads HBM once and writes once, cutting memory
+traffic by up to N$\times$. The spectrum runs from fully manual (FlashAttention,
+FlashRT) to fully automatic (torch.compile, XLA), with Triton and TensorRT in
+between. Manual fusion achieves the highest efficiency but requires GPU
+programming expertise.
+
+Liger-Kernel applies the same technique to training (fused RMSNorm + SwiGLU),
+claiming +20\% throughput and $-$60\% memory.}
+
+% -------------------------------------------------------------------------
+\begin{frame}{\#5 Speculative decoding: 2$\times$, and the same output}
+  \llmdiagK
+  \vspace{-0.4em}
+  \begin{center}
+    \begin{tikzpicture}[
+      font=\scriptsize,
+      tok/.style={rectangle, draw=black!40, fill=black!5, rounded corners=1pt,
+                  minimum width=0.7cm, minimum height=0.45cm, inner sep=1pt},
+      acc/.style={tok, draw=good, fill=good!15},
+      rej/.style={tok, draw=warn, fill=warn!15},
+      draft/.style={tok, draw=accent!50, fill=accent!8},
+      ar/.style={-{Latex[length=1.2mm]}, black!35},
+    ]
+    % Draft phase
+    \node[font=\tiny\bfseries, black!60] at (-1.2, 0.8) {draft model};
+    \foreach \i/\t in {0/The, 1/cat, 2/sat, 3/on, 4/a}
+      \node[draft] (d\i) at (\i*1.0, 0.8) {\t};
+    \foreach \i in {0,...,3}
+      \pgfmathtruncatemacro{\j}{\i+1}
+      \draw[ar, accent!50] (d\i)--(d\j);
+
+    % Verify phase
+    \node[font=\tiny\bfseries, black!60] at (-1.2, 0) {big model};
+    \node[font=\tiny, black!40] at (-1.2, -0.35) {(1 forward pass)};
+    \node[acc] (v0) at (0, 0) {The};
+    \node[acc] (v1) at (1.0, 0) {cat};
+    \node[acc] (v2) at (2.0, 0) {sat};
+    \node[rej] (v3) at (3.0, 0) {\color{warn}on};
+    \node[font=\tiny, warn] at (3.0, -0.45) {reject};
+    \node[acc] (v3c) at (4.0, 0) {upon};
+    \node[font=\tiny, good!60] at (4.0, -0.45) {correct};
+
+    % Arrows down from draft to verify
+    \foreach \i in {0,...,3}
+      \draw[ar] (d\i)--(v\i);
+    \end{tikzpicture}
+  \end{center}
+  \vspace{0.2em}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      \small
+      \textbf{Why it works:} decode is bandwidth-bound, so the GPU has spare
+      compute. Verifying $k$ draft tokens reads the weights \textbf{once}
+      (same bandwidth as 1 token) but uses $k\times$ the arithmetic.
+    \end{column}
+    \begin{column}{0.44\textwidth}
+      \small
+      \textbf{Why n-gram drafts work:} the acceptance rate only needs to
+      exceed $1/k$ to break even. Natural language has enough local
+      repetition (articles, prepositions, closing brackets) that even a
+      simple n-gram model achieves 50--70\% acceptance.
+    \end{column}
+  \end{columns}
+  \vspace{0.3em}
+  \begin{center}\small
+    Modified rejection sampling preserves the \emphc{exact target distribution}.
+  \end{center}
+\end{frame}
+\note{The diagram shows 5 draft tokens verified in one forward pass. Three
+accepted (green), one rejected (orange ``on'' replaced by ``upon''), and the
+correction token sampled from the residual distribution. The key insight: the
+big model reads its weights once for all 5 tokens, so the bandwidth cost is
+1 token while producing up to 5. An n-gram draft model works because even
+50\% acceptance at $k=5$ gives 2.5 tokens per weight read.
+
+The identical-distribution guarantee comes from modified rejection sampling:
+accept if $p_\text{target} \geq p_\text{draft}$, otherwise accept with
+probability $p_\text{target}/p_\text{draft}$ and sample a correction from
+the residual. Leviathan et al., arXiv:2302.01318.}
+
+% -------------------------------------------------------------------------
+\begin{frame}{Multi-Token Prediction trains the draft head into the model}
+  \textbf{MTP} trains a model to predict $D$ tokens ahead. At inference
+  the extra heads serve as a \emph{built-in draft} for speculative decoding,
+  so no separate draft model is needed.
+  \vspace{0.6em}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      \textbf{Training}\\[0.3em]
+      \small
+      $D$ auxiliary heads share the backbone and the embedding layer. Each head
+      predicts the token $d$ positions ahead. The MTP loss is averaged and
+      weighted by $\lambda$ (DeepSeek-V3 uses $\lambda{=}0.3$ for the first 10T
+      tokens, then $0.1$).
+    \end{column}
+    \begin{column}{0.44\textwidth}
+      \textbf{Inference}\\[0.3em]
+      \small
+      The auxiliary heads propose tokens, and the main model verifies them in
+      one forward pass (speculative decoding). The heads can also be
+      discarded, and the main model runs independently.
+    \end{column}
+  \end{columns}
+  \vspace{0.8em}
+  \begin{center}\small
+    DeepSeek-V3 ablation ($D{=}1$): HumanEval improved from 20.7\% to 26.8\%
+    (+6.1) on the small MoE, and from 44.5\% to 53.7\% (+9.2) on the large
+    MoE. The auxiliary loss regularizes training, so quality improves even
+    when the extra heads are discarded at inference.
+  \end{center}
+\end{frame}
+\note{The training effect is larger than the inference effect: the auxiliary
+heads regularize and improve quality even when discarded. The inference
+bonus is speculative decoding with no separate draft model.
+
+DeepSeek-V3 technical report (arXiv:2412.19437). NVIDIA NeMo supports MTP via
+\texttt{mtp\_num\_layers} and \texttt{mtp\_loss\_scaling\_factor}.}
+
 \section{Serving robot policies is a different problem}
 % =========================================================================
 
@@ -1533,186 +1712,6 @@ scale, which loses more precision on outlier-heavy weight distributions.
 NVFP4 keeps a floating-point scale on a 16-value block.
 
 Source: NVIDIA developer blog, ``Introducing NVFP4''.}
-
-% -------------------------------------------------------------------------
-\begin{frame}{\cutbadge{1: cut this first} \; Kernel fusion: why fused kernels are faster}
-  \llmdiagK
-  \vspace{-0.4em}
-  \begin{center}
-    \begin{tikzpicture}[
-      font=\tiny,
-      op/.style={rectangle, draw=black!40, fill=black!5, rounded corners=1pt,
-                 minimum width=1.0cm, minimum height=0.35cm, inner sep=1pt},
-      hbm/.style={rectangle, draw=warn!60, fill=warn!10, rounded corners=1pt,
-                  minimum width=5.5cm, minimum height=0.35cm, inner sep=1pt,
-                  font=\tiny\bfseries},
-      ar/.style={-{Latex[length=0.8mm]}, black!30},
-    ]
-    % Unfused: N round-trips
-    \node[font=\tiny\bfseries, black!60] at (-1.8, 1.0) {unfused};
-    \node[hbm] (hbm1) at (1.5, 1.5) {HBM};
-    \node[op] (r1) at (-0.3, 1.0) {RMSNorm};
-    \node[op] (r2) at (1.0, 1.0) {RoPE};
-    \node[op] (r3) at (2.3, 1.0) {SwiGLU};
-    \node[op] (r4) at (3.5, 1.0) {Quant};
-    \foreach \n in {r1,r2,r3,r4} {
-      \draw[ar, warn] (\n.north) -- ++(0,0.25);
-      \draw[ar, warn] (\n.north) ++(0.15,0.25) -- ++(0,-0.25);
-    }
-    \node[font=\tiny, warn, align=center] at (5.2, 1.25) {$4\times$\\read+write};
-
-    % Fused: 1 round-trip
-    \node[font=\tiny\bfseries, black!60] at (-1.8, -0.1) {fused};
-    \node[hbm] (hbm2) at (1.5, 0.4) {HBM};
-    \node[op, draw=good, fill=good!10, minimum width=4.6cm] (fused)
-      at (1.5, -0.1) {RMSNorm + RoPE + SwiGLU + Quant};
-    \draw[ar, good] (fused.north) -- ++(0,0.25);
-    \draw[ar, good] (fused.north) ++(0.15,0.25) -- ++(0,-0.25);
-    \node[font=\tiny, good!60, align=center] at (5.2, 0.15) {$1\times$\\read+write};
-    \end{tikzpicture}
-  \end{center}
-  \vspace{0.2em}
-  \scriptsize
-  \begin{center}
-    \begin{tabular}{@{}llp{6.5cm}@{}}
-      \toprule
-      & \textbf{approach} & \textbf{how it fuses} \\
-      \midrule
-      \textbf{FlashAttention} & hand-written CUDA
-        & fuses Q$\cdot$K$^T$ $\rightarrow$ softmax $\rightarrow$ $\times$V
-          in SRAM tiles, avoids materializing the $O(N^2)$ attention matrix \\
-      \textbf{Triton} & Python DSL
-        & tile-level GPU code, compiler handles memory staging \\
-      \textbf{torch.compile} & automatic
-        & traces PyTorch, applies fusion passes, emits Triton kernels \\
-      \textbf{JAX XLA} & automatic
-        & HLO fusion passes over the computation graph \\
-      \textbf{TensorRT} & offline
-        & graph-level layer fusion + per-GPU GEMM auto-tuning \\
-      \textbf{FlashRT} & hand-written + CUDA graph
-        & fused memory-bound ops, delegates GEMM to cuBLAS \\
-      \bottomrule
-    \end{tabular}
-  \end{center}
-\end{frame}
-\note{The single principle: a chain of N unfused kernels does N HBM
-round-trips. A fused kernel reads HBM once and writes once, cutting memory
-traffic by up to N$\times$. The spectrum runs from fully manual (FlashAttention,
-FlashRT) to fully automatic (torch.compile, XLA), with Triton and TensorRT in
-between. Manual fusion achieves the highest efficiency but requires GPU
-programming expertise.
-
-Liger-Kernel applies the same technique to training (fused RMSNorm + SwiGLU),
-claiming +20\% throughput and $-$60\% memory.}
-
-% -------------------------------------------------------------------------
-\begin{frame}{\cutbadge{2: trim next} \; \#5 Speculative decoding: 2$\times$, and the same output}
-  \llmdiagK
-  \vspace{-0.4em}
-  \begin{center}
-    \begin{tikzpicture}[
-      font=\scriptsize,
-      tok/.style={rectangle, draw=black!40, fill=black!5, rounded corners=1pt,
-                  minimum width=0.7cm, minimum height=0.45cm, inner sep=1pt},
-      acc/.style={tok, draw=good, fill=good!15},
-      rej/.style={tok, draw=warn, fill=warn!15},
-      draft/.style={tok, draw=accent!50, fill=accent!8},
-      ar/.style={-{Latex[length=1.2mm]}, black!35},
-    ]
-    % Draft phase
-    \node[font=\tiny\bfseries, black!60] at (-1.2, 0.8) {draft model};
-    \foreach \i/\t in {0/The, 1/cat, 2/sat, 3/on, 4/a}
-      \node[draft] (d\i) at (\i*1.0, 0.8) {\t};
-    \foreach \i in {0,...,3}
-      \pgfmathtruncatemacro{\j}{\i+1}
-      \draw[ar, accent!50] (d\i)--(d\j);
-
-    % Verify phase
-    \node[font=\tiny\bfseries, black!60] at (-1.2, 0) {big model};
-    \node[font=\tiny, black!40] at (-1.2, -0.35) {(1 forward pass)};
-    \node[acc] (v0) at (0, 0) {The};
-    \node[acc] (v1) at (1.0, 0) {cat};
-    \node[acc] (v2) at (2.0, 0) {sat};
-    \node[rej] (v3) at (3.0, 0) {\color{warn}on};
-    \node[font=\tiny, warn] at (3.0, -0.45) {reject};
-    \node[acc] (v3c) at (4.0, 0) {upon};
-    \node[font=\tiny, good!60] at (4.0, -0.45) {correct};
-
-    % Arrows down from draft to verify
-    \foreach \i in {0,...,3}
-      \draw[ar] (d\i)--(v\i);
-    \end{tikzpicture}
-  \end{center}
-  \vspace{0.2em}
-  \begin{columns}[T]
-    \begin{column}{0.52\textwidth}
-      \small
-      \textbf{Why it works:} decode is bandwidth-bound, so the GPU has spare
-      compute. Verifying $k$ draft tokens reads the weights \textbf{once}
-      (same bandwidth as 1 token) but uses $k\times$ the arithmetic.
-    \end{column}
-    \begin{column}{0.44\textwidth}
-      \small
-      \textbf{Why n-gram drafts work:} the acceptance rate only needs to
-      exceed $1/k$ to break even. Natural language has enough local
-      repetition (articles, prepositions, closing brackets) that even a
-      simple n-gram model achieves 50--70\% acceptance.
-    \end{column}
-  \end{columns}
-  \vspace{0.3em}
-  \begin{center}\small
-    Modified rejection sampling preserves the \emphc{exact target distribution}.
-  \end{center}
-\end{frame}
-\note{The diagram shows 5 draft tokens verified in one forward pass. Three
-accepted (green), one rejected (orange ``on'' replaced by ``upon''), and the
-correction token sampled from the residual distribution. The key insight: the
-big model reads its weights once for all 5 tokens, so the bandwidth cost is
-1 token while producing up to 5. An n-gram draft model works because even
-50\% acceptance at $k=5$ gives 2.5 tokens per weight read.
-
-The identical-distribution guarantee comes from modified rejection sampling:
-accept if $p_\text{target} \geq p_\text{draft}$, otherwise accept with
-probability $p_\text{target}/p_\text{draft}$ and sample a correction from
-the residual. Leviathan et al., arXiv:2302.01318.}
-
-% -------------------------------------------------------------------------
-\begin{frame}{\cutbadge{2: trim next} \; Multi-Token Prediction trains the draft head into the model}
-  \textbf{MTP} trains a model to predict $D$ tokens ahead. At inference
-  the extra heads serve as a \emph{built-in draft} for speculative decoding,
-  so no separate draft model is needed.
-  \vspace{0.6em}
-  \begin{columns}[T]
-    \begin{column}{0.52\textwidth}
-      \textbf{Training}\\[0.3em]
-      \small
-      $D$ auxiliary heads share the backbone and the embedding layer. Each head
-      predicts the token $d$ positions ahead. The MTP loss is averaged and
-      weighted by $\lambda$ (DeepSeek-V3 uses $\lambda{=}0.3$ for the first 10T
-      tokens, then $0.1$).
-    \end{column}
-    \begin{column}{0.44\textwidth}
-      \textbf{Inference}\\[0.3em]
-      \small
-      The auxiliary heads propose tokens, and the main model verifies them in
-      one forward pass (speculative decoding). The heads can also be
-      discarded, and the main model runs independently.
-    \end{column}
-  \end{columns}
-  \vspace{0.8em}
-  \begin{center}\small
-    DeepSeek-V3 ablation ($D{=}1$): HumanEval improved from 20.7\% to 26.8\%
-    (+6.1) on the small MoE, and from 44.5\% to 53.7\% (+9.2) on the large
-    MoE. The auxiliary loss regularizes training, so quality improves even
-    when the extra heads are discarded at inference.
-  \end{center}
-\end{frame}
-\note{The training effect is larger than the inference effect: the auxiliary
-heads regularize and improve quality even when discarded. The inference
-bonus is speculative decoding with no separate draft model.
-
-DeepSeek-V3 technical report (arXiv:2412.19437). NVIDIA NeMo supports MTP via
-\texttt{mtp\_num\_layers} and \texttt{mtp\_loss\_scaling\_factor}.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{\cutbadge{2: trim next} \; \#6 A smaller model, and \#7 more GPUs, last}
