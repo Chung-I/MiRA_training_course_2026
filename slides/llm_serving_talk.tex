@@ -170,35 +170,7 @@ arrives in Movement 1.}
 \end{frame}
 
 % -------------------------------------------------------------------------
-\begin{frame}[fragile]{A Colab notebook computes every number in this talk}
-  \begin{center}
-    {\small\url{github.com/Chung-I/MiRA_training_course_2026}}\\[0.3em]
-    {\footnotesize click the Colab badge next to
-     \texttt{notebooks/llm\_serving\_demo.ipynb}}\\[0.5em]
-    {\tiny\url{https://colab.research.google.com/github/Chung-I/MiRA_training_course_2026/blob/main/notebooks/llm_serving_demo.ipynb}}
-  \end{center}
-  \vspace{0.4em}
-  \begin{columns}[T]
-    \begin{column}{0.48\textwidth}
-      \textbf{Parts 1--5: no GPU, no installs}\\
-      \small Pure standard library. VRAM, KV cache, bandwidth and cost
-      calculators. This is the arithmetic half.
-    \end{column}
-    \begin{column}{0.48\textwidth}
-      \textbf{Parts 6--8: needs a GPU}\\
-      \small Colab free T4 is enough
-      (\texttt{Runtime $\rightarrow$ Change runtime type}).
-      These parts compare the predictions with a real card.
-    \end{column}
-  \end{columns}
-  \vspace{0.8em}
-  \begin{center}
-    \demo{Part 7} \quad and \quad \demo{Part 8} \quad run live, later.
-  \end{center}
-\end{frame}
-\note{\textbf{2:30.} Open the tab now and leave it open. Do not install
-anything live. Say: you can follow along, but you get more if you
-watch first and run it on the train home.}
+
 
 % =========================================================================
 \section{The VRAM budget}
@@ -388,75 +360,43 @@ talk hangs on this slide. Pause after ``for one user''.}
   Only one thing changed. \emphc{Grouped-Query Attention} shares one set of
   K/V across several query heads, so \texttt{kv\_heads} decreases from 32 to 8.
   Same formula, one quarter of the memory.
-\end{frame}
-\note{\textbf{7:30.} Parameter count is a bad proxy for servability. If
-somebody asks ``is a 7B easier to serve than an 8B'', this is the answer:
-read \texttt{num\_key\_value\_heads}, not the name.}
 
-% -------------------------------------------------------------------------
-\begin{frame}{GQA groups query heads to share fewer key-value pairs}
   \vspace{0.2em}
-  \llmdiagKV
   \begin{center}
-    \begin{tikzpicture}[
-      font=\scriptsize,
-      hd/.style={circle, minimum size=5.5mm, inner sep=0pt, draw=black!50,
+    \begin{tikzpicture}[font=\tiny,
+      hd/.style={circle, minimum size=4mm, inner sep=0pt, draw=black!50,
                  font=\tiny\bfseries},
       qh/.style={hd, fill=accent!20, draw=accent!60},
       kh/.style={hd, fill=good!25, draw=good!60},
-      ar/.style={-{Latex[length=1.2mm]}, black!40}
-    ]
-    % MHA
-    \node[font=\small\bfseries] at (0,2.1) {MHA};
+      ar/.style={-{Latex[length=1mm]}, black!40}]
+    \node[font=\scriptsize\bfseries] at (0,1.4) {MHA};
     \foreach \i in {0,...,3} {
-      \node[qh] (mq\i) at (\i*0.75-1.125, 1.3) {Q};
-      \node[kh] (mk\i) at (\i*0.75-1.125, 0.3) {KV};
-      \draw[ar] (mq\i)--(mk\i);
-    }
-    \node[font=\tiny, black!55] at (0,-0.3) {4 Q heads, 4 KV heads};
-
-    % GQA
-    \node[font=\small\bfseries] at (4.5,2.1) {GQA};
+      \node[qh] (mq\i) at (\i*0.55-0.825, 0.8) {Q};
+      \node[kh] (mk\i) at (\i*0.55-0.825, 0.15) {KV};
+      \draw[ar] (mq\i)--(mk\i); }
+    \node[font=\scriptsize\bfseries] at (3.2,1.4) {GQA};
     \foreach \i in {0,...,3}
-      \node[qh] (gq\i) at (\i*0.75+3.375, 1.3) {Q};
-    \node[kh] (gk0) at (3.75, 0.3) {KV};
-    \node[kh] (gk1) at (5.25, 0.3) {KV};
+      \node[qh] (gq\i) at (\i*0.55+2.375, 0.8) {Q};
+    \node[kh] (gk0) at (2.65, 0.15) {KV};
+    \node[kh] (gk1) at (3.75, 0.15) {KV};
     \draw[ar] (gq0)--(gk0); \draw[ar] (gq1)--(gk0);
     \draw[ar] (gq2)--(gk1); \draw[ar] (gq3)--(gk1);
-    \node[font=\tiny, black!55] at (4.5,-0.3) {4 Q heads, \emphc{2 KV heads}};
-
-    % MQA
-    \node[font=\small\bfseries] at (9,2.1) {MQA};
+    \node[font=\scriptsize\bfseries] at (6.4,1.4) {MQA};
     \foreach \i in {0,...,3}
-      \node[qh] (aq\i) at (\i*0.75+7.875, 1.3) {Q};
-    \node[kh] (ak0) at (9, 0.3) {KV};
+      \node[qh] (aq\i) at (\i*0.55+5.575, 0.8) {Q};
+    \node[kh] (ak0) at (6.4, 0.15) {KV};
     \foreach \i in {0,...,3} \draw[ar] (aq\i)--(ak0);
-    \node[font=\tiny, black!55] at (9,-0.3) {4 Q heads, \emphc{1 KV head}};
     \end{tikzpicture}
   \end{center}
-  \vspace{0.4em}
-  \begin{itemize}\small
-    \item In \textbf{MHA}, each query head has its own key-value head.
-          Cache size scales with the number of heads.
-    \item In \textbf{GQA}, $G$ query heads share one KV head.
-          Llama-3-8B uses $G{=}4$: 32 query heads, 8 KV heads.
-    \item In \textbf{MQA}, all query heads share one KV head.
-          MQA is faster than GQA, but quality degrades on long output.
-  \end{itemize}
-  \vspace{0.3em}
-  \begin{center}\small
-    Ainslie et al.\ uptrained T5-XXL from MHA to GQA-8 in 5\% of the original
-    training steps. Inference was \emphc{5.4$\times$ faster} (1.51\,s
-    $\rightarrow$ 0.28\,s) with no measurable quality loss (ROUGE-1: 46.2
-    $\rightarrow$ 46.8).
-  \end{center}
 \end{frame}
-\note{\textbf{8:00.} Point at the arrows in the diagram. GQA-8 means 8
-groups: for Llama-3 that is 32/8 = 4 query heads per KV head. The uptraining
-path converts an MHA checkpoint to GQA by mean-pooling the KV projection
-matrices, then training for 5\% more steps.
+\note{\textbf{7:30.} Parameter count is a bad proxy for servability. If
+somebody asks ``is a 7B easier to serve than an 8B'', this is the answer:
+read \texttt{num\_key\_value\_heads}, not the name.
 
-arXiv:2305.13245.}
+Ainslie et al.\ uptrained T5-XXL from MHA to GQA-8 in 5\% of the original
+training steps. Inference was 5.4$\times$ faster (1.51\,s $\rightarrow$
+0.28\,s) with no measurable quality loss. arXiv:2305.13245.}
+
 
 % -------------------------------------------------------------------------
 \begin{frame}{Concurrent user capacity: VRAM minus weights, divided by KV per user}
@@ -833,36 +773,6 @@ with the same system prompt point at the same physical blocks.}
 If someone asks which one, answer: the one that your engine supports for your
 card. The next slide has the details for the curious.}
 
-% -------------------------------------------------------------------------
-\begin{frame}{AWQ, GPTQ, NVFP4: three ways to shrink the weights}
-  \llmdiagW
-  \vspace{-0.2em}
-  \small
-  \begin{itemize}\setlength{\itemsep}{0.6em}
-    \item \textbf{GPTQ} (Frantar et al., ICLR 2023) quantizes weights one
-          column at a time using an approximate second-order method. Each
-          column is rounded, and the rounding error is compensated by
-          adjusting all remaining columns via the inverse Hessian. A
-          calibration set of $\sim$128 examples computes the Hessian.
-          GPTQ runs in minutes on one GPU.
-    \item \textbf{AWQ} (Lin et al., MLSys 2024) observes that $\sim$1\% of
-          weights process large-magnitude activations and matter
-          disproportionately. AWQ applies per-channel scaling before
-          quantization: it multiplies important weight channels by a scale
-          factor and divides the activations by the same factor, shifting
-          the quantization grid to protect those weights.
-    \item \textbf{NVFP4} stores each weight in 4 bits of floating-point
-          (1 sign, 2 exponent, 1 mantissa). A block of 16 values shares
-          an E4M3 scale factor, and the tensor has a global FP32 scale.
-          Requires Blackwell fifth-generation Tensor Cores.
-  \end{itemize}
-\end{frame}
-\note{This slide is for the audience member who asks ``what does AWQ actually
-do?'' The key difference: GPTQ compensates rounding error through the Hessian.
-AWQ protects salient weights by rescaling before quantization. NVFP4 uses a
-hardware-native 4-bit float format with fine-grained block scaling.
-
-arXiv:2210.17323 (GPTQ), arXiv:2306.00978 (AWQ).}
 
 % -------------------------------------------------------------------------
 \begin{frame}{\#4 Prefix caching: reuse KV blocks across requests}
@@ -981,26 +891,6 @@ orange = evicted. Point at the branch point after ``sys prompt'': two
 different documents share the same system-prompt KV pages. A hash-based cache
 misses this if the documents start at different block boundaries.}
 
-% -------------------------------------------------------------------------
-\begin{frame}{SGLang: cache tiering, constrained decoding, prefill/decode split}
-  \llmdiagSKV
-  \begin{itemize}
-    \item \textbf{HiCache tiering.} L1 in GPU memory, L2 in host RAM, L3 in
-          distributed storage. VRAM no longer bounds your cache.
-    \item \textbf{Constrained decoding, on a fast path.} A JSON schema or a regex
-          constrains generation. This is why SGLang is popular for
-          \emph{agents and tool calling}.
-    \item \textbf{Zero-overhead CPU scheduler} with a longest-prefix-match
-          scheduling policy.
-    \item \textbf{EAGLE-2/3 and adaptive speculative decoding.}
-    \item \textbf{Prefill/decode disaggregation} onto separate server groups.
-          The two phases have opposite bottlenecks, so do not make them
-          share a GPU. (EPD also splits vision encoding, for VLMs.)
-  \end{itemize}
-\end{frame}
-\note{\textbf{26:00.} PD disaggregation is the direct operational consequence
-of Movement 2: prefill is compute-bound, decode is bandwidth-bound, so give
-them different machines. One sentence, then continue.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{Measured throughput: HF, vLLM, SGLang on RTX 5090}
@@ -1349,45 +1239,25 @@ with different execution shapes, so the server schedules them separately.}
   \begin{center}\small
     Batch size 1 means dispatch overhead \emph{is} your latency budget.
   \end{center}
+
+  \vspace{0.3em}
+  \begin{center}\scriptsize
+    \begin{tabular}{llrl}
+      \toprule
+      model & hardware & latency & speedup \\
+      \midrule
+      pi0.5, FP8 & RTX 5090 & \textbf{17.6\,ms} (57\,Hz) & \\
+      pi0.5, FP8 & Jetson Thor & \textbf{44.0\,ms} (23\,Hz)
+        & \emphc{13.9$\times$} vs 714\,ms \\
+      \bottomrule
+    \end{tabular}
+    \quad {\tiny\warnc{FlashRT reported. Not reproduced.}}
+  \end{center}
 \end{frame}
 \note{\textbf{30:30.} At batch 1 with a 20\,ms budget, Python dispatch of a
 few hundred kernels takes a large fraction of the frame. One
 CUDA graph replaces all of it with a single launch.}
 
-% -------------------------------------------------------------------------
-\begin{frame}{FlashRT latency: 714\,ms to 44\,ms on the same model}
-  \begin{center}\small
-    \begin{tabular}{llrl}
-      \toprule
-      model & hardware & latency & against \\
-      \midrule
-      pi0.5, 2-view, FP8 & RTX 5090       & \textbf{17.6\,ms} (57\,Hz) & n/a \\
-      pi0.5, 2-view, FP8 & Jetson AGX Thor & \textbf{44.0\,ms} (23\,Hz)
-        & \emphc{13.9$\times$} vs OpenPI reference, 714\,ms \\
-      pi0, 2-view, FP8   & RTX 5090       & 21.2\,ms (47\,Hz) & n/a \\
-      GR00T N1.6, $T{=}50$ & RTX 5090     & 13.1\,ms (76\,Hz)
-        & 2.37$\times$ vs TensorRT, 31\,ms \\
-      \bottomrule
-    \end{tabular}
-  \end{center}
-  \vspace{0.3em}
-  {\scriptsize \warnc{FlashRT reported these numbers.} We did not reproduce them.}
-  \vspace{0.8em}
-  \begin{center}
-    \begin{minipage}{0.9\textwidth}
-      \begin{alertblock}{The teaching point}
-        \centering
-        Quantization, kernel fusion and removal of dispatch overhead:
-        \textbf{the same three ideas as the LLM half of this talk,}
-        aimed at a batch of one.\\[0.3em]
-        Serving techniques apply to robot policies at batch 1.
-      \end{alertblock}
-    \end{minipage}
-  \end{center}
-\end{frame}
-\note{\textbf{31:30.} Same architecture, same weights, 16x
-faster on the same board. No retraining. End of Movement 3c.
-Target: 32 minutes.}
 
 % =========================================================================
 \section{Deciding, and measuring}
@@ -1474,6 +1344,7 @@ a flag was sufficient.}
 Give them the sentence that they can say to a PI: ``at our utilization this
 costs X per million tokens, and the API costs Y''.}
 
+
 % -------------------------------------------------------------------------
 \begin{frame}{Benchmarking: five rules for reproducible measurements}
   \begin{enumerate}
@@ -1485,38 +1356,14 @@ costs X per million tokens, and the API costs Y''.}
           A 20-token prompt tells you nothing about a RAG deployment.
     \item \textbf{Report TTFT, ITL and throughput together.}
           One of them alone misleads.
-    \item \textbf{Re-run the arithmetic} from Parts 1--5 against what the
-          server reports. The two must agree. If they do not, suspect the
-          benchmark first.
+    \item \textbf{Re-run the arithmetic} from the VRAM and bandwidth formulas
+          against what the server reports. The two must agree. If they do not,
+          suspect the benchmark first.
   \end{enumerate}
 \end{frame}
 \note{\textbf{34:00.} Point 5 is the whole talk in one instruction: the
 arithmetic is a check on your measurement, and the measurement is a check on
 your arithmetic.}
-
-% =========================================================================
-% Close (no section page: the checklist speaks for itself)
-% =========================================================================
-
-\begin{frame}{Seven steps for your first deployment}
-  \vspace{0.2em}
-  \begin{enumerate}
-    \item \textbf{Compute the weight memory} before you download anything.
-    \item \textbf{Compute the KV cache per token}. That is your user capacity.
-    \item \textbf{Serve it with vLLM or SGLang.} Skip the for-loop.
-    \item \textbf{Quantize to int4}, then re-run \emph{your own} eval.
-    \item \textbf{Quantize the KV cache as well.}
-    \item \textbf{If your prompts share a prefix, cache it.}
-    \item \textbf{Report TTFT, ITL and throughput at a stated concurrency}
-          or report nothing.
-  \end{enumerate}
-  \vspace{0.6em}
-  \begin{center}\small
-    Steps 1 and 2 need no GPU, no installs and about two minutes.
-  \end{center}
-\end{frame}
-\note{\textbf{35:30.} This is the slide that they photograph. Stop for three
-seconds and let them take it. Then give the take-home.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{Deployment sizing is arithmetic on two numbers}
@@ -1604,6 +1451,36 @@ note{Backup. The negative result, and the answer to ``why is TRT-LLM last in
 your table'': we benchmarked it on the wrong workload and kept it to make
 that point.}
 
+% -------------------------------------------------------------------------
+\begin{frame}{Backup: AWQ, GPTQ, NVFP4 quantization mechanisms}
+  \llmdiagW
+  \vspace{-0.2em}
+  \small
+  \begin{itemize}\setlength{\itemsep}{0.6em}
+    \item \textbf{GPTQ} (Frantar et al., ICLR 2023) quantizes weights one
+          column at a time using an approximate second-order method. Each
+          column is rounded, and the rounding error is compensated by
+          adjusting all remaining columns via the inverse Hessian. A
+          calibration set of $\sim$128 examples computes the Hessian.
+          GPTQ runs in minutes on one GPU.
+    \item \textbf{AWQ} (Lin et al., MLSys 2024) observes that $\sim$1\% of
+          weights process large-magnitude activations and matter
+          disproportionately. AWQ applies per-channel scaling before
+          quantization: it multiplies important weight channels by a scale
+          factor and divides the activations by the same factor, shifting
+          the quantization grid to protect those weights.
+    \item \textbf{NVFP4} stores each weight in 4 bits of floating-point
+          (1 sign, 2 exponent, 1 mantissa). A block of 16 values shares
+          an E4M3 scale factor, and the tensor has a global FP32 scale.
+          Requires Blackwell fifth-generation Tensor Cores.
+  \end{itemize}
+\end{frame}
+\note{This slide is for the audience member who asks ``what does AWQ actually
+do?'' The key difference: GPTQ compensates rounding error through the Hessian.
+AWQ protects salient weights by rescaling before quantization. NVFP4 uses a
+hardware-native 4-bit float format with fine-grained block scaling.
+
+arXiv:2210.17323 (GPTQ), arXiv:2306.00978 (AWQ).}
 % -------------------------------------------------------------------------
 \begin{frame}{Backup: NVFP4 stores weights in 4-bit floats on Blackwell}
   \small
