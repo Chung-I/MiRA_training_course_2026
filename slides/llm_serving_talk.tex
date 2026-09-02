@@ -444,7 +444,11 @@ is 4x cheaper.}
 \end{frame}
 \note{\textbf{12:30.} Run this live. The 1.008 ratio earns their trust in the
 arithmetic. The 9.4\% earns you Movement 3. \texttt{generate()} is a
-correctness reference.}
+correctness reference.
+
+On Qwen3.5-9B (17.9 GB fp16): \texttt{generate()} reaches 29.4 tok/s at
+batch 1, against a bandwidth ceiling of 100 tok/s (29.4\% efficiency). The
+eager forward pass launches 12,921 CUDA kernels per token.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{Report TTFT, ITL and throughput together}
@@ -954,6 +958,66 @@ programming expertise.
 
 Liger-Kernel applies the same technique to training (fused RMSNorm + SwiGLU),
 claiming +20\% throughput and $-$60\% memory.}
+
+% -------------------------------------------------------------------------
+\begin{frame}{Measured: torch.compile on Qwen3.5-9B (RTX 5090)}
+  \vspace{0.2em}
+  \begin{columns}[c]
+    \begin{column}{0.48\textwidth}
+      \centering\small
+      \begin{tabular}{@{}lrr@{}}
+        \toprule
+        \textbf{stage} & \textbf{kernels} & \textbf{time} \\
+        \midrule
+        Eager & \warnc{12,921} & \warnc{210.7\,ms} \\
+        + Inductor & 3,379 & 28.1\,ms \\
+        + CUDA graphs & 3,379 & \goodc{16.0\,ms} \\
+        \bottomrule
+      \end{tabular}
+      \vspace{0.6em}
+
+      {\scriptsize 9.0B params, fp16, single forward pass.\\
+       Inductor fused 9,542 elementwise kernels\\
+       into Triton kernels.}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \centering
+      \begin{tikzpicture}[font=\scriptsize]
+        \def\bw{3.5}
+        % Eager bar
+        \fill[warn!40] (0, 1.6) rectangle (\bw, 2.0);
+        \node[font=\tiny, anchor=west] at (\bw+0.1, 1.8) {210.7 ms};
+        \node[font=\tiny, anchor=east] at (-0.1, 1.8) {Eager};
+        % Compiled bar
+        \fill[accent!40] (0, 0.8) rectangle (\bw*28.07/210.67, 1.2);
+        \node[font=\tiny, anchor=west] at (\bw*28.07/210.67+0.1, 1.0) {28.1 ms};
+        \node[font=\tiny, anchor=east] at (-0.1, 1.0) {Inductor};
+        % CG bar
+        \fill[good!40] (0, 0.0) rectangle (\bw*16.0/210.67, 0.4);
+        \node[font=\tiny, anchor=west] at (\bw*16.0/210.67+0.1, 0.2) {16.0 ms};
+        \node[font=\tiny, anchor=east] at (-0.1, 0.2) {+ CUDA graph};
+      \end{tikzpicture}
+      \vspace{0.3em}
+
+      \small
+      \textbf{7.5$\times$} from kernel fusion alone.\\
+      \textbf{13.2$\times$} with CUDA graphs.
+    \end{column}
+  \end{columns}
+  \vspace{0.3em}
+  \begin{center}\small
+    \texttt{torch.compile} captures the graph (TorchDynamo), fuses
+    elementwise ops into Triton kernels (TorchInductor), and replays the
+    sequence with one \texttt{cudaGraphLaunch} (CUDA graphs).
+  \end{center}
+\end{frame}
+\note{These numbers are from a single forward pass (prefill, 9 tokens), not
+decode. The 12,921 eager kernels are dominated by 10,520 elementwise ops
+(activations, norms, residual adds) that Inductor collapses into fused Triton
+kernels. The 465 GEMMs stay unfused because cuBLAS/CUTLASS are already
+optimal.
+
+The notebook \texttt{torch\_compile\_profile.ipynb} reproduces this.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{\#5 Speculative decoding: draft, verify, accept}
