@@ -71,7 +71,7 @@
 
 \begin{document}
 
-% --- 1 -----------------------------------------------------------------
+% --- 1 ----------------------------------------------------------------
 \begin{frame}[plain]
   \titlepage
 \end{frame}
@@ -80,7 +80,7 @@ Skip the warm-up. Target: finish at 17:48.
 
 CHECKPOINT: 17:20 here.}
 
-% --- 2 -----------------------------------------------------------------
+% --- 2 ----------------------------------------------------------------
 \begin{frame}{Three ideas about graph neural networks}
   \begin{enumerate}
     \setlength{\itemsep}{1.1em}
@@ -96,474 +96,12 @@ there is one equation and no spectral graph theory. Then stop early.
 
 Do not define a graph yet. Show four robot pictures first.}
 
-% --- 3 -----------------------------------------------------------------
-\begin{frame}{A network plans eight arms in one workspace}
-  \begin{columns}[T]
-    \begin{column}{0.52\textwidth}
-      \vspace{0.5em}
-      \textbf{RoboBallet} plans reach motions for up to \alert{8 arms and
-      40 tasks} that share one workspace. It uses a GNN plus RL, and it does
-      not re-plan for each scene.
-      \vspace{0.8em}
 
-      Nodes: arms, tasks, obstacles.\\
-      Edges: \alert{who can collide with whom}.
-      \vfill
-      \arx{2509.05397}
-    \end{column}
-    \begin{column}{0.44\textwidth}
-      \centering
-      \begin{tikzpicture}[scale=0.82, every node/.style={transform shape}]
-        \tikzset{
-          arm/.style={circle, draw=acc2, fill=acc2!15, minimum size=6.5mm,
-                      font=\tiny\bfseries, inner sep=0pt},
-          tsk/.style={rectangle, rounded corners=1pt, draw=dim, fill=black!4,
-                      minimum size=5mm, font=\tiny, inner sep=1pt},
-          col/.style={draw=acc, dashed, thick, opacity=0.75}
-        }
-        \node[arm] (a1) at (-1.5, 1.1) {A1};
-        \node[arm] (a2) at ( 1.5, 1.1) {A2};
-        \node[arm] (a3) at (-1.5,-1.1) {A3};
-        \node[arm] (a4) at ( 1.5,-1.1) {A4};
-        \node[tsk] (t1) at (0, 1.5) {t};
-        \node[tsk] (t2) at (0,-1.5) {t};
-        \node[tsk] (t3) at (0, 0.0) {t};
-        \draw[col] (a1)--(a2); \draw[col] (a3)--(a4);
-        \draw[col] (a1)--(a3); \draw[col] (a2)--(a4);
-        \draw[col] (a1)--(a4);
-        \draw[dim] (a1)--(t1); \draw[dim] (a2)--(t1);
-        \draw[dim] (a3)--(t2); \draw[dim] (a4)--(t2);
-        \draw[dim] (a1)--(t3); \draw[dim] (a4)--(t3);
-      \end{tikzpicture}
+% =========================================================================
+% Movement 1: What GNNs are for, and how to build the graph
+% =========================================================================
 
-      {\scriptsize\color{dim}dashed = possible collision}
-    \end{column}
-  \end{columns}
-\end{frame}
-\note{Say one sentence, then continue. Save the architecture for the reveal on slide 7.}
-
-% --- 4 -----------------------------------------------------------------
-\begin{frame}{A robot that pours and folds with a particle model}
-  \vspace{0.5em}
-  \textbf{DPI-Net} learns the dynamics of rigid bodies, deformable objects
-  \alert{and fluids} from particles. Then it uses that model to manipulate them.
-  \vspace{1.0em}
-
-  \begin{columns}[T]
-    \begin{column}{0.5\textwidth}
-      Nodes: \alert{particles} of the object.\\[0.4em]
-      Edges: \alert{contacts} (and rigid-group links).
-    \end{column}
-    \begin{column}{0.5\textwidth}
-      The input is a particle set of any size. The same weights run on a scene
-      with more particles than any training scene, because every particle
-      runs the same message function.
-    \end{column}
-  \end{columns}
-  \vfill
-  \arx{1810.01566}
-\end{frame}
-\note{Plant the "variable number of things" point here. You use it on the
-flattening-fails slide.}
-
-% --- 5 -----------------------------------------------------------------
-\begin{frame}{A physics engine fit from data}
-  \vspace{0.5em}
-  \textbf{GNS} and \textbf{MeshGraphNets} simulate sand, water and cloth by
-  \alert{message passing on the mesh}. The network learned the dynamics from
-  simulator rollouts.
-  \vspace{1.0em}
-
-  \begin{columns}[T]
-    \begin{column}{0.5\textwidth}
-      Nodes: particles, or mesh vertices.\\[0.4em]
-      Edges: within a contact radius, or mesh edges.
-    \end{column}
-    \begin{column}{0.5\textwidth}
-      They \alert{generalize to more particles than the training set had}.
-    \end{column}
-  \end{columns}
-  \vfill
-  \arx{2002.09405} \hfill \arx{2010.03409}
-\end{frame}
-\note{Flag the generalization fact now. Use it on the multi-robot /
-invariance slide. Do not explain it yet.}
-
-% --- 6 -----------------------------------------------------------------
-\begin{frame}{A map a planner can reason over}
-  \vspace{0.4em}
-  \textbf{3D Dynamic Scene Graphs} turn a metric map into a graph of
-  \alert{places, objects and humans}. A planner can query this graph.
-  \vspace{0.6em}
-
-  \begin{center}
-    \begin{tikzpicture}[scale=0.9, every node/.style={transform shape},
-      lvl/.style={rectangle, rounded corners=2pt, draw=acc2, fill=acc2!10,
-                  minimum width=22mm, minimum height=6mm, font=\scriptsize},
-      lk/.style={-{Latex[length=1.6mm]}, dim}]
-      \node[lvl] (b) at (0,0)    {objects, humans};
-      \node[lvl] (p) at (0,1.0)  {places};
-      \node[lvl] (r) at (0,2.0)  {rooms};
-      \node[lvl] (f) at (0,3.0)  {building};
-      \draw[lk] (b)--(p); \draw[lk] (p)--(r); \draw[lk] (r)--(f);
-      \node[right=6mm of b, font=\scriptsize, color=dim, align=left]
-        {containment, adjacency,\\ ``the mug is on the table''};
-      \node[right=6mm of r, font=\scriptsize, color=dim, align=left]
-        {a hierarchy, so a planner can\\ reason at the right scale};
-    \end{tikzpicture}
-  \end{center}
-  \vfill
-  \arx{2002.06289}
-\end{frame}
-\note{This is the fourth and last application. The next slide is the reveal. Pause before it.
-
-CHECKPOINT: 17:24 by the end of this slide.}
-
-% --- 7 -----------------------------------------------------------------
-\begin{frame}{All four are the same architecture}
-  \vspace{0.6em}
-  \begin{center}
-    \Large
-    One layer type, repeated, processes the arms,\\ the particles, the cloth
-    mesh and the building.
-  \end{center}
-  \vfill
-  \begin{center}
-    \normalsize\color{dim}
-    None of these is a grid or a sequence.
-  \end{center}
-\end{frame}
-\note{Pause here. Wait before the wake-up question.}
-
-% --- 8 -----------------------------------------------------------------
-\begin{frame}{What does a CNN assume? What does a Transformer assume?}
-  \vspace{1.4em}
-  \begin{columns}[T]
-    \begin{column}{0.45\textwidth}
-      \centering
-      \onslide<2->{A \textbf{CNN} assumes a \alert{grid}.\\
-      {\small The neighbors of a pixel are the adjacent pixels.}}
-    \end{column}
-    \begin{column}{0.45\textwidth}
-      \centering
-      \onslide<3->{A \textbf{Transformer} assumes an \alert{ordered sequence}.\\
-      {\small Each token has a position 1, 2, 3, \dots}}
-    \end{column}
-  \end{columns}
-  \vfill
-  \onslide<4->{\begin{center}\large
-    None of the four examples is a grid or a sequence.
-  \end{center}}
-\end{frame}
-\note{Hands up, say it aloud. Ask it, wait, and take answers from the room. These 45 seconds keep them awake
-for the next 25 minutes.
-
-If nobody answers within five seconds, answer it yourself and move on.}
-
-% --- 9 -----------------------------------------------------------------
-\begin{frame}{Flattening fails: relabel the nodes and the answer changes}
-  \vspace{0.4em}
-  An MLP takes six objects on a table as one flattened vector.
-  \vspace{0.8em}
-
-  \begin{center}
-    \begin{tikzpicture}[scale=0.95, every node/.style={transform shape},
-      box/.style={rectangle, draw=dim, minimum width=7mm, minimum height=7mm,
-                  font=\scriptsize}]
-      \foreach \i/\lab in {0/1,1/2,2/3,3/4,4/5,5/6}
-        \node[box] at (\i*0.78, 0.9) {\lab};
-      \node[font=\scriptsize, color=dim] at (-1.15,0.9) {order A};
-      \foreach \i/\lab in {0/4,1/1,2/6,3/2,4/5,5/3}
-        \node[box, fill=acc!10, draw=acc] at (\i*0.78, 0) {\lab};
-      \node[font=\scriptsize, color=acc] at (-1.15,0) {order B};
-      \node[align=left, font=\small, anchor=west] at (5.1,0.45)
-        {\alert{The same scene} in a different order\\ is a different vector, so the MLP\\ gives a different answer.};
-    \end{tikzpicture}
-  \end{center}
-  \vspace{0.6em}
-  The MLP has to learn $n!$ copies of the same function. A GNN sums over
-  neighbors, and a sum \alert{ignores order}.
-\end{frame}
-\note{Demo 1 in the notebook shows this with numbers. If the room is dead,
-switch to Colab and run Demo 1. When you renumber the nodes, the MLP output
-changes on screen.}
-
-% --- 10 ----------------------------------------------------------------
-\begin{frame}{Flattening fails: the number of objects changes}
-  \vspace{1.2em}
-  \begin{center}
-    \Large
-    A fixed input dimension cannot take a \alert{variable number of objects}.
-  \end{center}
-  \vspace{1.4em}
-  \begin{itemize}
-    \setlength{\itemsep}{0.7em}
-    \item A DPI-Net scene has one node per particle, and that count differs per object.
-    \item A learned simulator is tested on more particles than any training scene had.
-    \item A scene graph has one node per object in the room, and the room changes.
-  \end{itemize}
-  \vfill
-  \begin{center}\small\color{dim}
-    A scene with more objects than the maximum breaks a padded input. Truncation discards real objects.
-  \end{center}
-\end{frame}
-\note{40 seconds. The audience already believes this one.}
-
-% --- 11 ----------------------------------------------------------------
-\begin{frame}{A Transformer is a GNN on the complete graph}
-  \vspace{0.4em}
-  \begin{center}
-    \begin{tikzpicture}[scale=0.85, every node/.style={transform shape},
-      n/.style={circle, draw=acc2, fill=acc2!15, minimum size=5mm, inner sep=0pt}]
-      \begin{scope}
-        \foreach \i in {0,...,5} \node[n] (a\i) at (\i*60:1.1) {};
-        \foreach \i/\j in {0/1,0/2,0/3,0/4,0/5,1/2,1/3,1/4,1/5,
-                           2/3,2/4,2/5,3/4,3/5,4/5}
-          \draw[dim, opacity=0.6] (a\i)--(a\j);
-        \node at (0,-1.75) {\small Transformer: all-to-all attention};
-      \end{scope}
-      \begin{scope}[xshift=6cm]
-        \foreach \i in {0,...,5} \node[n] (b\i) at (\i*60:1.1) {};
-        \foreach \i/\j in {0/1,1/2,2/3,3/4,4/5,5/0,0/3}
-          \draw[acc, thick] (b\i)--(b\j);
-        \node at (0,-1.75) {\small GNN: sparse, known edges};
-      \end{scope}
-    \end{tikzpicture}
-  \end{center}
-  \vspace{0.3em}
-  \begin{itemize}\small
-    \item Self-attention sends a message $m_{ij} = \mathrm{softmax}_j(q_i
-          \cdot k_j / \sqrt{d})\, W_v h_j$ from every token $j$ to every
-          token $i$. That is MSG + AGG on the complete graph.
-    \item GAT restricts the same computation to real edges, with additive
-          instead of dot-product attention.
-    \item The equivalence breaks at three points: \alert{positional encodings}
-          (without them, the Transformer treats its input as a set),
-          the \alert{feed-forward block} (per-node, no graph analogue),
-          and \alert{LayerNorm / residual stream}.
-  \end{itemize}
-\end{frame}
-\note{Ask the smartest question in the room before anyone else does. This removes
-the objection that otherwise stays with a listener for 20 minutes.
-
-The mapping (Joshi 2020/2025, Dwivedi \& Bresson 2021): nodes = tokens,
-edges = all-to-all, MSG = value vector scaled by softmax attention, AGG = sum.
-GAT is the sparse case. The FFN, residual, and LayerNorm are non-graph parts.
-
-CHECKPOINT: 17:28 by the end of this slide. Movement 3 starts now.}
-
-% -------------------------------------------------------------------------
-\begin{frame}{When the known graph wins, and when it does not}
-  \vspace{0.4em}
-  \begin{columns}[T]
-    \begin{column}{0.48\textwidth}
-      \textbf{Encode the known graph} when the interaction structure is
-      \alert{physical, sparse, and cheap to compute}: contacts, mesh edges,
-      communication range.
-      \vspace{0.5em}
-
-      GNS generalizes from thousands of particles to $10\times$ more.
-      Li \& Prorok's planner generalizes to larger robot teams.
-      RoboBallet generalizes zero-shot to new placements.
-      \vspace{0.4em}
-
-      \arx{2002.09405} \arx{1912.06095} \arx{2509.05397}
-    \end{column}
-    \begin{column}{0.48\textwidth}
-      \textbf{Learn the edges with attention} when the graph is an artifact,
-      long-range interactions dominate, or data is plentiful.
-      \vspace{0.5em}
-
-      Kurin et al.\ (Amorpheus, ICLR 2021) showed that encoding the
-      \alert{kinematic tree hurts} morphology control: a Transformer over
-      limbs outperformed the GNN that used the physical graph.
-      The stated reason: multi-hop propagation through a sparse tree
-      loses gradient signal.
-    \end{column}
-  \end{columns}
-  \vspace{0.6em}
-  \begin{center}\small
-    Point Transformer v3 (CVPR 2024) displaced DGCNN on point clouds for
-    the same reason: the k-NN graph is geometric, but attention over all
-    points captures global context that local message passing misses.
-  \end{center}
-\end{frame}
-\note{The decision rule from the deep-research review: encode the sparse graph
-when (a) the edges are physical and cheap to compute, (b) you need size
-generalization, and (c) data is limited. Learn the edges when the ``graph'' is
-a modeling artifact or data is abundant.
-
-The Amorpheus result is the counterexample that teaches judgment: the physical
-graph existed and hurt. Reading GNS and Amorpheus back to back gives the
-decision rule.
-
-arXiv:2106.03672 (Amorpheus), arXiv:2408.16932 (PT v3).}
-
-% --- 12 ----------------------------------------------------------------
-\begin{frame}{One idea: each node makes a summary of its neighbors, then repeats}
-  \vspace{-0.4em}
-  \begin{center}
-    \begin{tikzpicture}[scale=0.92, every node/.style={transform shape},
-      nb/.style={circle, draw=acc2, fill=acc2!15, minimum size=8mm,
-                 font=\small, inner sep=0pt},
-      me/.style={circle, draw=acc, very thick, fill=acc!12, minimum size=10mm,
-                 font=\small, inner sep=0pt},
-      msg/.style={-{Latex[length=2mm]}, acc2, thick}]
-
-      \node[me] (v) at (0,0) {$\hv$};
-      \node[nb] (u1) at (150:2.3) {$h_{u_1}$};
-      \node[nb] (u2) at ( 90:2.3) {$h_{u_2}$};
-      \node[nb] (u3) at ( 30:2.3) {$h_{u_3}$};
-      \node[nb] (u4) at (270:2.3) {$h_{u_4}$};
-
-      \foreach \u in {u1,u2,u3,u4} \draw[msg] (\u) -- (v);
-      \node[color=acc2, font=\scriptsize, anchor=north east] at (-0.95,0.32)
-        {message};
-
-      \node<2->[draw=acc, fill=white, rounded corners=2pt, font=\scriptsize,
-            right=3.0cm of v, align=center] (agg)
-        {sum / mean / max\\ \color{dim}(order-independent)};
-      \draw<2->[-{Latex[length=2mm]}, acc, thick] (v) -- (agg);
-
-      \node<3->[draw=good, fill=good!8, rounded corners=2pt, font=\scriptsize,
-            below=0.9cm of agg, align=center] (upd)
-        {small MLP\\ \color{dim}update the node};
-      \draw<3->[-{Latex[length=2mm]}, good, thick] (agg) -- (upd);
-    \end{tikzpicture}
-  \end{center}
-  \vspace{-0.3em}
-  \begin{enumerate}
-    \item<1-> Each neighbor \alert{sends a message}.
-    \item<2-> The node combines them with an \alert{order-independent} function: sum, mean or max.
-    \item<3-> The node \alert{updates its own vector} with a small MLP. The layer repeats $L$ times.
-  \end{enumerate}
-\end{frame}
-\note{Say the sentence before any notation appears. Do not rush this slide, and
-do not add symbols yet. If they remember one slide, make it this one.}
-
-% --- 13 ----------------------------------------------------------------
-\begin{frame}{The message-passing equation, in three clicks}
-  \vspace{1.6em}
-  \begin{center}
-    \large
-    \only<1>{$\hv \;\leftarrow\; \textcolor{dim}{\mathrm{UPDATE}\Big(\hv,\;
-      \mathrm{AGG}\big\{}\;\textcolor{acc}{\mathrm{MSG}(\hv, \hu, e_{uv})}\;
-      \textcolor{dim}{:\; u \in \Nv \big\}\Big)}$}
-    \only<2>{$\hv \;\leftarrow\; \textcolor{dim}{\mathrm{UPDATE}\Big(\hv,\;}
-      \textcolor{acc}{\mathrm{AGG}\big\{}\;\mathrm{MSG}(\hv, \hu, e_{uv})\;
-      \textcolor{acc}{:\; u \in \Nv \big\}}\textcolor{dim}{\Big)}$}
-    \only<3->{$\hv \;\leftarrow\; \textcolor{acc}{\mathrm{UPDATE}\Big(}\hv
-      \textcolor{acc}{,}\;
-      \mathrm{AGG}\big\{\;\mathrm{MSG}(\hv, \hu, e_{uv})\;:\; u \in \Nv \big\}
-      \textcolor{acc}{\Big)}$}
-  \end{center}
-  \vspace{1.8em}
-  \begin{center}
-    \only<1>{\alert{A neighbor $u$ sends a message to $v$.} The message can use
-      the features of $v$, the features of $u$, and \emph{the edge feature $e_{uv}$}.}
-    \only<2>{\alert{AGG combines all the messages} with a sum, mean or max.
-      Because that function ignores order, the layer is permutation invariant.}
-    \only<3>{\alert{UPDATE is a small MLP} on $(h_v,\ \text{summary})$.
-      That completes one layer.}
-    \only<4>{\alert{A GNN is $L$ of these layers}, stacked.}
-  \end{center}
-  \vspace{1.2em}
-  \onslide<4->{\begin{center}\small\color{dim}
-    GCN in one line: $H \leftarrow \hat{A}\,(H W)$, with
-    $\hat{A} = D^{-1/2}(A+I)D^{-1/2}$, a normalized neighbor average, then a
-    linear map.
-  \end{center}}
-\end{frame}
-\note{This is the only equation in the talk. Read it left to right, out loud,
-one click at a time. Point at the colored piece each time.
-
-Emphasize: $e_{uv}$ is the edge feature. In robotics that is the
-relative pose. That design decision is worth more than the architecture.
-
-CHECKPOINT: 17:32 by the end of this slide.}
-
-% --- 14 ----------------------------------------------------------------
-\begin{frame}{$L$ layers $=$ an $L$-hop receptive field}
-  \vspace{0.2em}
-  \begin{center}
-    \begin{tikzpicture}[scale=1.0, every node/.style={transform shape},
-      n/.style={circle, draw=dim, fill=black!3, minimum size=6.5mm, inner sep=0pt},
-      h1/.style={circle, draw=acc2, very thick, fill=acc2!30, minimum size=6.5mm,
-                 inner sep=0pt},
-      h2/.style={circle, draw=good, very thick, fill=good!25, minimum size=6.5mm,
-                 inner sep=0pt},
-      me/.style={circle, draw=acc, very thick, fill=acc!25, minimum size=7.5mm,
-                 inner sep=0pt}]
-
-      \coordinate (cv) at (0,0);
-      \coordinate (ca) at (-1.6, 1.0);  \coordinate (cb) at (1.6, 1.0);
-      \coordinate (cc) at (0,-1.6);
-      \coordinate (cd) at (-3.1, 1.8);  \coordinate (ce) at (-2.7,-0.3);
-      \coordinate (cf) at ( 3.1, 1.8);  \coordinate (cg) at ( 2.7,-0.3);
-      \coordinate (ch) at (-1.4,-2.7);  \coordinate (ci) at ( 1.4,-2.7);
-
-      \foreach \x/\y in {cv/ca, cv/cb, cv/cc, ca/cd, ca/ce, cb/cf, cb/cg,
-                         cc/ch, cc/ci, ce/ch}
-        \draw[dim] (\x) -- (\y);
-
-      % base state: every node grey
-      \foreach \c in {ca,cb,cc,cd,ce,cf,cg,ch,ci} \node[n] at (\c) {};
-      % 1-hop lights up on click 2
-      \node<2->[h1] at (ca) {}; \node<2->[h1] at (cb) {}; \node<2->[h1] at (cc) {};
-      % 2-hop lights up on click 3
-      \node<3->[h2] at (cd) {}; \node<3->[h2] at (ce) {}; \node<3->[h2] at (cf) {};
-      \node<3->[h2] at (cg) {}; \node<3->[h2] at (ch) {}; \node<3->[h2] at (ci) {};
-      \node[me] at (cv) {\tiny $v$};
-
-      \node[font=\small, anchor=west, color=acc]  at (3.9,1.70)
-        {layer 0: $v$ only};
-      \node<2->[font=\small, anchor=west, color=acc2] at (3.9,1.00)
-        {after 1 layer: 1 hop};
-      \node<3->[font=\small, anchor=west, color=good] at (3.9,0.30)
-        {after 2 layers: 2 hops};
-    \end{tikzpicture}
-  \end{center}
-  \vspace{-0.6em}
-  \onslide<4->{\begin{center}\large
-    After $L$ layers, $h_v$ depends on every node within $L$ hops,\\
-    the same way a CNN receptive field grows by one pixel per layer.
-  \end{center}}
-\end{frame}
-\note{Demo 3 in the notebook shows this. Put a 1 on node 0 and propagate. The
-non-zero set grows one hop per layer.
-
-Most of the room already has the CNN receptive-field picture. Give them
-the mapping and stop.}
-
-% --- 15 ----------------------------------------------------------------
-\begin{frame}{GCN, GraphSAGE, GAT differ only in the AGG box}
-  \vspace{0.6em}
-  \begin{center}
-  \small
-  \begin{tabular}{@{}lll@{}}
-    \toprule
-    & \textbf{AGG} & \textbf{Use it when} \\
-    \midrule
-    \textbf{GCN}       & normalized mean & first. It is the baseline \\[0.5em]
-    \textbf{GraphSAGE} & sample neighbors, then mean/max
-                       & the graph is large, or new nodes\\
-                       & & appear at test time \\[0.5em]
-    \textbf{GAT}       & attention-weighted sum
-                       & some neighbors matter more than others \\
-    \bottomrule
-  \end{tabular}
-  \end{center}
-  \vfill
-  \begin{center}\large
-    GCN, GraphSAGE and GAT share MSG and UPDATE, and differ only in \alert{AGG}.
-  \end{center}
-\end{frame}
-\note{Say it aloud: they differ in that one box. Most GNN variants are this
-single choice. This slide removes the fear of the literature.
-
-Do not discuss expressiveness or the WL test. If someone asks, give one sentence.}
-
-% --- 16 ----------------------------------------------------------------
+% --- 3 ----------------------------------------------------------------
 \begin{frame}{Three task types, three readouts}
   \vspace{0.8em}
   \begin{itemize}
@@ -581,7 +119,7 @@ Do not discuss expressiveness or the WL test. If someone asks, give one sentence
 an architecture. Do not take
 answers. There is no time.}
 
-% --- 17 ----------------------------------------------------------------
+% --- 4 ----------------------------------------------------------------
 \begin{frame}{Graph construction: k-NN, radius, or fully connected}
   \vspace{-0.2em}
   \begin{columns}[T]
@@ -670,7 +208,7 @@ This slide saves them time. Say so.
 
 CHECKPOINT: 17:37 by the end of this slide.}
 
-% --- 18 ----------------------------------------------------------------
+% --- 5 ----------------------------------------------------------------
 \begin{frame}{What the nodes and edges were}
   \vspace{-0.5em}
   \centering
@@ -717,7 +255,7 @@ row closest to the projects in this room.
 
 Tell them that the slide is in the repo, so they do not photograph it.}
 
-% --- 19 ----------------------------------------------------------------
+% --- 6 ----------------------------------------------------------------
 \begin{frame}{In multi-robot systems, a ``message'' is a real radio message}
   \vspace{0.8em}
   \begin{center}\large
@@ -740,7 +278,7 @@ slowly. Both generalize beyond robotics.
 
 Use the promise from the GNS slide.}
 
-% --- 20 ----------------------------------------------------------------
+% --- 7 ----------------------------------------------------------------
 \begin{frame}{Deeper is worse: over-smoothing after 3 layers}
   \vspace{0.2em}
   \begin{columns}[c]
@@ -861,7 +399,7 @@ is the line the last twenty minutes were about.
 
 If someone asks about libraries: PyTorch Geometric. If you need heterogeneous graphs, use DGL.}
 
-% --- 22 ----------------------------------------------------------------
+% --- 8 ----------------------------------------------------------------
 \begin{frame}{PyTorch Geometric tutorials on Colab}
   \vspace{0.4em}
   \begin{center}\small
@@ -895,7 +433,7 @@ Budget 2 minutes. If a cell fails, close it and say the link is on this slide.
 
 CHECKPOINT: back on slides by 17:44.}
 
-% --- 23 ----------------------------------------------------------------
+% --- 9 ----------------------------------------------------------------
 \begin{frame}{When \emph{not} to use a GNN}
   \vspace{0.8em}
   \begin{itemize}
@@ -926,7 +464,7 @@ MeshGraphNets), and multi-robot coordination (Li \& Prorok) all held with
 GNNs. The field has converged on hybrids (GraphGPS), but T\"onshoff et al.\
 (LoG 2023) showed that tuned MPNNs close most of the reported gap.}
 
-% --- 24 ----------------------------------------------------------------
+% --- 10 ---------------------------------------------------------------
 \begin{frame}{When is a problem a graph?}
   \vspace{1.2em}
   \begin{enumerate}
@@ -945,7 +483,7 @@ problem is a graph.
 
 Give them five seconds of silence to test their own project against it.}
 
-% --- 25 ----------------------------------------------------------------
+% --- 11 ---------------------------------------------------------------
 \begin{frame}{Take-home}
   \vspace{0.2em}
   \begin{center}
@@ -977,7 +515,7 @@ Give them five seconds of silence to test their own project against it.}
 
 CHECKPOINT: 17:48. You promised 17:50. Finish early.}
 
-% --- 26 ----------------------------------------------------------------
+% --- 12 ---------------------------------------------------------------
 \begin{frame}[plain]
   \vspace{2.2em}
   \begin{center}
@@ -1026,5 +564,344 @@ CHECKPOINT: 17:48. You promised 17:50. Finish early.}
   encodings exceed 1-WL and reach between 1-WL and 3-WL (TokenGT, Graphormer,
   GRIT). But higher WL expressiveness does not reliably predict benchmark
   accuracy. Give the sentence and move on.}
+
+
+% =========================================================================
+% Movement 2: The message-passing layer
+% =========================================================================
+
+% --- 13 ---------------------------------------------------------------
+\begin{frame}{One idea: each node makes a summary of its neighbors, then repeats}
+  \vspace{-0.4em}
+  \begin{center}
+    \begin{tikzpicture}[scale=0.92, every node/.style={transform shape},
+      nb/.style={circle, draw=acc2, fill=acc2!15, minimum size=8mm,
+                 font=\small, inner sep=0pt},
+      me/.style={circle, draw=acc, very thick, fill=acc!12, minimum size=10mm,
+                 font=\small, inner sep=0pt},
+      msg/.style={-{Latex[length=2mm]}, acc2, thick}]
+
+      \node[me] (v) at (0,0) {$\hv$};
+      \node[nb] (u1) at (150:2.3) {$h_{u_1}$};
+      \node[nb] (u2) at ( 90:2.3) {$h_{u_2}$};
+      \node[nb] (u3) at ( 30:2.3) {$h_{u_3}$};
+      \node[nb] (u4) at (270:2.3) {$h_{u_4}$};
+
+      \foreach \u in {u1,u2,u3,u4} \draw[msg] (\u) -- (v);
+      \node[color=acc2, font=\scriptsize, anchor=north east] at (-0.95,0.32)
+        {message};
+
+      \node<2->[draw=acc, fill=white, rounded corners=2pt, font=\scriptsize,
+            right=3.0cm of v, align=center] (agg)
+        {sum / mean / max\\ \color{dim}(order-independent)};
+      \draw<2->[-{Latex[length=2mm]}, acc, thick] (v) -- (agg);
+
+      \node<3->[draw=good, fill=good!8, rounded corners=2pt, font=\scriptsize,
+            below=0.9cm of agg, align=center] (upd)
+        {small MLP\\ \color{dim}update the node};
+      \draw<3->[-{Latex[length=2mm]}, good, thick] (agg) -- (upd);
+    \end{tikzpicture}
+  \end{center}
+  \vspace{-0.3em}
+  \begin{enumerate}
+    \item<1-> Each neighbor \alert{sends a message}.
+    \item<2-> The node combines them with an \alert{order-independent} function: sum, mean or max.
+    \item<3-> The node \alert{updates its own vector} with a small MLP. The layer repeats $L$ times.
+  \end{enumerate}
+\end{frame}
+\note{Say the sentence before any notation appears. Do not rush this slide, and
+do not add symbols yet. If they remember one slide, make it this one.}
+
+% --- 14 ---------------------------------------------------------------
+\begin{frame}{The message-passing equation, in three clicks}
+  \vspace{1.6em}
+  \begin{center}
+    \large
+    \only<1>{$\hv \;\leftarrow\; \textcolor{dim}{\mathrm{UPDATE}\Big(\hv,\;
+      \mathrm{AGG}\big\{}\;\textcolor{acc}{\mathrm{MSG}(\hv, \hu, e_{uv})}\;
+      \textcolor{dim}{:\; u \in \Nv \big\}\Big)}$}
+    \only<2>{$\hv \;\leftarrow\; \textcolor{dim}{\mathrm{UPDATE}\Big(\hv,\;}
+      \textcolor{acc}{\mathrm{AGG}\big\{}\;\mathrm{MSG}(\hv, \hu, e_{uv})\;
+      \textcolor{acc}{:\; u \in \Nv \big\}}\textcolor{dim}{\Big)}$}
+    \only<3->{$\hv \;\leftarrow\; \textcolor{acc}{\mathrm{UPDATE}\Big(}\hv
+      \textcolor{acc}{,}\;
+      \mathrm{AGG}\big\{\;\mathrm{MSG}(\hv, \hu, e_{uv})\;:\; u \in \Nv \big\}
+      \textcolor{acc}{\Big)}$}
+  \end{center}
+  \vspace{1.8em}
+  \begin{center}
+    \only<1>{\alert{A neighbor $u$ sends a message to $v$.} The message can use
+      the features of $v$, the features of $u$, and \emph{the edge feature $e_{uv}$}.}
+    \only<2>{\alert{AGG combines all the messages} with a sum, mean or max.
+      Because that function ignores order, the layer is permutation invariant.}
+    \only<3>{\alert{UPDATE is a small MLP} on $(h_v,\ \text{summary})$.
+      That completes one layer.}
+    \only<4>{\alert{A GNN is $L$ of these layers}, stacked.}
+  \end{center}
+  \vspace{1.2em}
+  \onslide<4->{\begin{center}\small\color{dim}
+    GCN in one line: $H \leftarrow \hat{A}\,(H W)$, with
+    $\hat{A} = D^{-1/2}(A+I)D^{-1/2}$, a normalized neighbor average, then a
+    linear map.
+  \end{center}}
+\end{frame}
+\note{This is the only equation in the talk. Read it left to right, out loud,
+one click at a time. Point at the colored piece each time.
+
+Emphasize: $e_{uv}$ is the edge feature. In robotics that is the
+relative pose. That design decision is worth more than the architecture.
+
+CHECKPOINT: 17:32 by the end of this slide.}
+
+% --- 15 ---------------------------------------------------------------
+\begin{frame}{$L$ layers $=$ an $L$-hop receptive field}
+  \vspace{0.2em}
+  \begin{center}
+    \begin{tikzpicture}[scale=1.0, every node/.style={transform shape},
+      n/.style={circle, draw=dim, fill=black!3, minimum size=6.5mm, inner sep=0pt},
+      h1/.style={circle, draw=acc2, very thick, fill=acc2!30, minimum size=6.5mm,
+                 inner sep=0pt},
+      h2/.style={circle, draw=good, very thick, fill=good!25, minimum size=6.5mm,
+                 inner sep=0pt},
+      me/.style={circle, draw=acc, very thick, fill=acc!25, minimum size=7.5mm,
+                 inner sep=0pt}]
+
+      \coordinate (cv) at (0,0);
+      \coordinate (ca) at (-1.6, 1.0);  \coordinate (cb) at (1.6, 1.0);
+      \coordinate (cc) at (0,-1.6);
+      \coordinate (cd) at (-3.1, 1.8);  \coordinate (ce) at (-2.7,-0.3);
+      \coordinate (cf) at ( 3.1, 1.8);  \coordinate (cg) at ( 2.7,-0.3);
+      \coordinate (ch) at (-1.4,-2.7);  \coordinate (ci) at ( 1.4,-2.7);
+
+      \foreach \x/\y in {cv/ca, cv/cb, cv/cc, ca/cd, ca/ce, cb/cf, cb/cg,
+                         cc/ch, cc/ci, ce/ch}
+        \draw[dim] (\x) -- (\y);
+
+      % base state: every node grey
+      \foreach \c in {ca,cb,cc,cd,ce,cf,cg,ch,ci} \node[n] at (\c) {};
+      % 1-hop lights up on click 2
+      \node<2->[h1] at (ca) {}; \node<2->[h1] at (cb) {}; \node<2->[h1] at (cc) {};
+      % 2-hop lights up on click 3
+      \node<3->[h2] at (cd) {}; \node<3->[h2] at (ce) {}; \node<3->[h2] at (cf) {};
+      \node<3->[h2] at (cg) {}; \node<3->[h2] at (ch) {}; \node<3->[h2] at (ci) {};
+      \node[me] at (cv) {\tiny $v$};
+
+      \node[font=\small, anchor=west, color=acc]  at (3.9,1.70)
+        {layer 0: $v$ only};
+      \node<2->[font=\small, anchor=west, color=acc2] at (3.9,1.00)
+        {after 1 layer: 1 hop};
+      \node<3->[font=\small, anchor=west, color=good] at (3.9,0.30)
+        {after 2 layers: 2 hops};
+    \end{tikzpicture}
+  \end{center}
+  \vspace{-0.6em}
+  \onslide<4->{\begin{center}\large
+    After $L$ layers, $h_v$ depends on every node within $L$ hops,\\
+    the same way a CNN receptive field grows by one pixel per layer.
+  \end{center}}
+\end{frame}
+\note{Demo 3 in the notebook shows this. Put a 1 on node 0 and propagate. The
+non-zero set grows one hop per layer.
+
+Most of the room already has the CNN receptive-field picture. Give them
+the mapping and stop.}
+
+% --- 16 ---------------------------------------------------------------
+\begin{frame}{GCN, GraphSAGE, GAT differ only in the AGG box}
+  \vspace{0.6em}
+  \begin{center}
+  \small
+  \begin{tabular}{@{}lll@{}}
+    \toprule
+    & \textbf{AGG} & \textbf{Use it when} \\
+    \midrule
+    \textbf{GCN}       & normalized mean & first. It is the baseline \\[0.5em]
+    \textbf{GraphSAGE} & sample neighbors, then mean/max
+                       & the graph is large, or new nodes\\
+                       & & appear at test time \\[0.5em]
+    \textbf{GAT}       & attention-weighted sum
+                       & some neighbors matter more than others \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+  \vfill
+  \begin{center}\large
+    GCN, GraphSAGE and GAT share MSG and UPDATE, and differ only in \alert{AGG}.
+  \end{center}
+\end{frame}
+\note{Say it aloud: they differ in that one box. Most GNN variants are this
+single choice. This slide removes the fear of the literature.
+
+Do not discuss expressiveness or the WL test. If someone asks, give one sentence.}
+
+
+% =========================================================================
+% Movement 3: GNNs and Transformers
+% =========================================================================
+
+% --- 17 ---------------------------------------------------------------
+\begin{frame}{What does a CNN assume? What does a Transformer assume?}
+  \vspace{1.4em}
+  \begin{columns}[T]
+    \begin{column}{0.45\textwidth}
+      \centering
+      \onslide<2->{A \textbf{CNN} assumes a \alert{grid}.\\
+      {\small The neighbors of a pixel are the adjacent pixels.}}
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \centering
+      \onslide<3->{A \textbf{Transformer} assumes an \alert{ordered sequence}.\\
+      {\small Each token has a position 1, 2, 3, \dots}}
+    \end{column}
+  \end{columns}
+  \vfill
+  \onslide<4->{\begin{center}\large
+    None of the four examples is a grid or a sequence.
+  \end{center}}
+\end{frame}
+\note{Hands up, say it aloud. Ask it, wait, and take answers from the room. These 45 seconds keep them awake
+for the next 25 minutes.
+
+If nobody answers within five seconds, answer it yourself and move on.}
+
+% --- 18 ---------------------------------------------------------------
+\begin{frame}{Flattening fails: relabel the nodes and the answer changes}
+  \vspace{0.4em}
+  An MLP takes six objects on a table as one flattened vector.
+  \vspace{0.8em}
+
+  \begin{center}
+    \begin{tikzpicture}[scale=0.95, every node/.style={transform shape},
+      box/.style={rectangle, draw=dim, minimum width=7mm, minimum height=7mm,
+                  font=\scriptsize}]
+      \foreach \i/\lab in {0/1,1/2,2/3,3/4,4/5,5/6}
+        \node[box] at (\i*0.78, 0.9) {\lab};
+      \node[font=\scriptsize, color=dim] at (-1.15,0.9) {order A};
+      \foreach \i/\lab in {0/4,1/1,2/6,3/2,4/5,5/3}
+        \node[box, fill=acc!10, draw=acc] at (\i*0.78, 0) {\lab};
+      \node[font=\scriptsize, color=acc] at (-1.15,0) {order B};
+      \node[align=left, font=\small, anchor=west] at (5.1,0.45)
+        {\alert{The same scene} in a different order\\ is a different vector, so the MLP\\ gives a different answer.};
+    \end{tikzpicture}
+  \end{center}
+  \vspace{0.6em}
+  The MLP has to learn $n!$ copies of the same function. A GNN sums over
+  neighbors, and a sum \alert{ignores order}.
+\end{frame}
+\note{Demo 1 in the notebook shows this with numbers. If the room is dead,
+switch to Colab and run Demo 1. When you renumber the nodes, the MLP output
+changes on screen.}
+
+% --- 19 ---------------------------------------------------------------
+\begin{frame}{Flattening fails: the number of objects changes}
+  \vspace{1.2em}
+  \begin{center}
+    \Large
+    A fixed input dimension cannot take a \alert{variable number of objects}.
+  \end{center}
+  \vspace{1.4em}
+  \begin{itemize}
+    \setlength{\itemsep}{0.7em}
+    \item A DPI-Net scene has one node per particle, and that count differs per object.
+    \item A learned simulator is tested on more particles than any training scene had.
+    \item A scene graph has one node per object in the room, and the room changes.
+  \end{itemize}
+  \vfill
+  \begin{center}\small\color{dim}
+    A scene with more objects than the maximum breaks a padded input. Truncation discards real objects.
+  \end{center}
+\end{frame}
+\note{40 seconds. The audience already believes this one.}
+
+% --- 20 ---------------------------------------------------------------
+\begin{frame}{A Transformer is a GNN on the complete graph}
+  \vspace{0.4em}
+  \begin{center}
+    \begin{tikzpicture}[scale=0.85, every node/.style={transform shape},
+      n/.style={circle, draw=acc2, fill=acc2!15, minimum size=5mm, inner sep=0pt}]
+      \begin{scope}
+        \foreach \i in {0,...,5} \node[n] (a\i) at (\i*60:1.1) {};
+        \foreach \i/\j in {0/1,0/2,0/3,0/4,0/5,1/2,1/3,1/4,1/5,
+                           2/3,2/4,2/5,3/4,3/5,4/5}
+          \draw[dim, opacity=0.6] (a\i)--(a\j);
+        \node at (0,-1.75) {\small Transformer: all-to-all attention};
+      \end{scope}
+      \begin{scope}[xshift=6cm]
+        \foreach \i in {0,...,5} \node[n] (b\i) at (\i*60:1.1) {};
+        \foreach \i/\j in {0/1,1/2,2/3,3/4,4/5,5/0,0/3}
+          \draw[acc, thick] (b\i)--(b\j);
+        \node at (0,-1.75) {\small GNN: sparse, known edges};
+      \end{scope}
+    \end{tikzpicture}
+  \end{center}
+  \vspace{0.3em}
+  \begin{itemize}\small
+    \item Self-attention sends a message $m_{ij} = \mathrm{softmax}_j(q_i
+          \cdot k_j / \sqrt{d})\, W_v h_j$ from every token $j$ to every
+          token $i$. That is MSG + AGG on the complete graph.
+    \item GAT restricts the same computation to real edges, with additive
+          instead of dot-product attention.
+    \item The equivalence breaks at three points: \alert{positional encodings}
+          (without them, the Transformer treats its input as a set),
+          the \alert{feed-forward block} (per-node, no graph analogue),
+          and \alert{LayerNorm / residual stream}.
+  \end{itemize}
+\end{frame}
+\note{Ask the smartest question in the room before anyone else does. This removes
+the objection that otherwise stays with a listener for 20 minutes.
+
+The mapping (Joshi 2020/2025, Dwivedi \& Bresson 2021): nodes = tokens,
+edges = all-to-all, MSG = value vector scaled by softmax attention, AGG = sum.
+GAT is the sparse case. The FFN, residual, and LayerNorm are non-graph parts.
+
+CHECKPOINT: 17:28 by the end of this slide. Movement 3 starts now.}
+
+% -------------------------------------------------------------------------
+\begin{frame}{When the known graph wins, and when it does not}
+  \vspace{0.4em}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \textbf{Encode the known graph} when the interaction structure is
+      \alert{physical, sparse, and cheap to compute}: contacts, mesh edges,
+      communication range.
+      \vspace{0.5em}
+
+      GNS generalizes from thousands of particles to $10\times$ more.
+      Li \& Prorok's planner generalizes to larger robot teams.
+      RoboBallet generalizes zero-shot to new placements.
+      \vspace{0.4em}
+
+      \arx{2002.09405} \arx{1912.06095} \arx{2509.05397}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{Learn the edges with attention} when the graph is an artifact,
+      long-range interactions dominate, or data is plentiful.
+      \vspace{0.5em}
+
+      Kurin et al.\ (Amorpheus, ICLR 2021) showed that encoding the
+      \alert{kinematic tree hurts} morphology control: a Transformer over
+      limbs outperformed the GNN that used the physical graph.
+      The stated reason: multi-hop propagation through a sparse tree
+      loses gradient signal.
+    \end{column}
+  \end{columns}
+  \vspace{0.6em}
+  \begin{center}\small
+    Point Transformer v3 (CVPR 2024) displaced DGCNN on point clouds for
+    the same reason: the k-NN graph is geometric, but attention over all
+    points captures global context that local message passing misses.
+  \end{center}
+\end{frame}
+\note{The decision rule from the deep-research review: encode the sparse graph
+when (a) the edges are physical and cheap to compute, (b) you need size
+generalization, and (c) data is limited. Learn the edges when the ``graph'' is
+a modeling artifact or data is abundant.
+
+The Amorpheus result is the counterexample that teaches judgment: the physical
+graph existed and hurt. Reading GNS and Amorpheus back to back gives the
+decision rule.
+
+arXiv:2106.03672 (Amorpheus), arXiv:2408.16932 (PT v3).}
+
 
 \end{document}
