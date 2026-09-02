@@ -367,39 +367,59 @@ Do not discuss expressiveness or the WL test. If someone asks, give one sentence
 
 % --- 10 ---------------------------------------------------------------
 \begin{frame}{Deeper is worse: over-smoothing after 3 layers}
-  \vspace{0.4em}
-  \begin{columns}[T]
-    \begin{column}{0.50\textwidth}
+  \vspace{0.2em}
+  \begin{columns}[c]
+    \begin{column}{0.48\textwidth}
+      \centering\small
+      \textbf{GCN on Cora} (2,708 nodes, 7 classes, hidden=16)
+      \vspace{0.3em}
+
+      \begin{tabular}{@{}rr@{}}
+        \toprule
+        layers & test accuracy \\
+        \midrule
+        1 & 80.7\% \\
+        \textbf{2} & \textcolor{good}{\textbf{81.1\%}} \\
+        3 & 77.9\% \\
+        4 & 69.2\% \\
+        6 & \textcolor{acc}{\textbf{49.2\%}} \\
+        8 & \textcolor{acc}{\textbf{35.9\%}} \\
+        \bottomrule
+      \end{tabular}
+
+      \vspace{0.4em}
+      {\scriptsize Measured with the PyG node-classification tutorial.\\
+       An MLP on the same features reaches 57.1\%.}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \footnotesize
       After enough rounds of averaging with neighbors, \alert{each node in a
       connected graph holds the same vector}. Li et al.\ (AAAI 2018) identified
       this as over-smoothing.
-      \vspace{0.6em}
+      \vspace{0.5em}
 
-      The PyG node-classification tutorial on Cora shows the pattern: accuracy
-      peaks at 2--3 GCN layers and collapses by 6--8. The pairwise distance
-      between node embeddings drops toward zero at the same rate.
-    \end{column}
-    \begin{column}{0.46\textwidth}
       \textbf{Two caveats:}
       \begin{itemize}\setlength{\itemsep}{0.3em}
         \item The cliff mixes over-smoothing with the difficulty of
           \alert{deep GCN training} without residual connections.
-        \item On real benchmarks the optimum is \alert{2--3 layers}. Deeper
-          GCNs rarely help unless the graph has been rewired (see over-squashing).
+        \item On Cora, the optimum is \alert{2 layers}. Deeper GCNs rarely
+          help unless the graph has been rewired (see over-squashing).
       \end{itemize}
-      \vspace{0.6em}
-      Under either explanation, \alert{two layers} is the right starting point.
     \end{column}
   \end{columns}
 \end{frame}
-\note{The PyG node-classification tutorial (Cora, GCN) is the best live demo for
-this: add layers and watch accuracy drop. If you run it during the talk, stop
-at 8 layers.
+\note{Numbers measured by running the official PyG node-classification tutorial
+on Cora with GCN (hidden=16, 5 runs averaged). The MLP baseline (57.1\%) uses
+the same node features without any graph structure.
+
+The live demo: open the tutorial, change num\_layers, and re-run. Accuracy
+visibly drops at 6 and 8 layers.
 
 Li et al., ``Deeper Insights into Graph Convolutional Networks for
 Semi-Supervised Learning,'' AAAI 2018.
 
-If you need long-range information, add a global node or a hierarchy. Do not add depth.}
+If you need long-range information, add a global node or a hierarchy. Do not
+add depth.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{Over-squashing: depth does not fix long-range dependencies}
@@ -471,35 +491,55 @@ If someone asks about libraries: PyTorch Geometric. If you need heterogeneous gr
 
 % --- 11 ---------------------------------------------------------------
 \begin{frame}{PyTorch Geometric tutorials on Colab}
-  \vspace{0.4em}
+  \vspace{0.2em}
   \begin{center}\small
     \textbf{Official PyG Colab notebooks}
     \quad{\scriptsize\url{https://pytorch-geometric.readthedocs.io/en/latest/get\_started/colabs.html}}
   \end{center}
-  \vspace{0.6em}
-  \begin{itemize}\small
-    \setlength{\itemsep}{0.6em}
-    \item \href{https://colab.research.google.com/drive/1h3-vJGRVloF5zStxL5I0rSy4ZUPNsjy8}{\textbf{Introduction}}:
-          GNN fundamentals, the \texttt{Data} object, and a first GCN.
-    \item \href{https://colab.research.google.com/drive/14OvFnAXggxB8vM4e8vSURUp1TaKnovzX}{\textbf{Node classification}}:
-          semi-supervised classification on Cora with GCN, GAT, GraphSAGE.
-          Maps directly to slide 15 (the AGG table).
-    \item \href{https://colab.research.google.com/drive/1I8a0DfQ3fI7Njc62__mVXUlcAleUclnb}{\textbf{Graph classification}}:
-          whole-graph prediction with readout pooling.
-          Maps directly to slide 16 (graph-level row).
-    \item \href{https://colab.research.google.com/drive/1D45E5bUK3gQ40YpZo65ozs7hg5l-eo_U}{\textbf{Point cloud classification}}:
-          3D point clouds as graphs, the robotics entry point.
-  \end{itemize}
-  \vspace{0.6em}
-  \begin{center}\small\color{dim}
-    All four run on a free Colab CPU or T4. No local installs needed.
+  \vspace{0.3em}
+  \centering\small
+  \begin{tabular}{@{}llrl@{}}
+    \toprule
+    \textbf{Tutorial} & \textbf{Dataset} & \textbf{Result} & \textbf{Graph} \\
+    \midrule
+    \href{https://colab.research.google.com/drive/1h3-vJGRVloF5zStxL5I0rSy4ZUPNsjy8}{Introduction}
+      & KarateClub (34 nodes)
+      & 76.5\%
+      & social network \\[0.3em]
+    \href{https://colab.research.google.com/drive/14OvFnAXggxB8vM4e8vSURUp1TaKnovzX}{Node classif.}
+      & Cora (2,708 nodes)
+      & \textcolor{good}{\textbf{81.1\%}}
+      & citation \\
+      & {\color{dim}MLP baseline}
+      & {\color{dim}57.1\%}
+      & {\color{dim}(no graph)} \\[0.3em]
+    \href{https://colab.research.google.com/drive/1I8a0DfQ3fI7Njc62__mVXUlcAleUclnb}{Graph classif.}
+      & MUTAG (188 graphs)
+      & 78.9\%
+      & molecular bonds \\[0.3em]
+    \href{https://colab.research.google.com/drive/1D45E5bUK3gQ40YpZo65ozs7hg5l-eo_U}{Point clouds}
+      & ModelNet10
+      &
+      & radius ball \\
+    \bottomrule
+  \end{tabular}
+  \vspace{0.4em}
+
+  \begin{center}\small
+    The 24-point gap between MLP and GCN on Cora comes from the citation
+    graph. The node features alone do not separate the classes.
   \end{center}
 \end{frame}
-\note{These are the official PyG tutorials, maintained by the PyG team. Each one
-is self-contained and installs PyG inside the notebook.
+\note{All four run on a free Colab CPU or T4. Each installs PyG inside the
+notebook.
 
-If time allows, open the Introduction notebook and run the first GCN cell live.
-Budget 2 minutes. If a cell fails, close it and say the link is on this slide.
+The node-classification result (MLP 57.1\% vs GCN 81.1\%) is the single most
+useful number in the talk for explaining why graph structure matters. The
+over-smoothing table on the previous slide comes from the same tutorial with
+the layer count varied.
+
+If time allows, open the node-classification notebook and change num\_layers
+live. Budget 2 minutes. If a cell fails, close it and point at this slide.
 
 CHECKPOINT: back on slides by 17:44.}
 
