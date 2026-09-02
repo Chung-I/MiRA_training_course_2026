@@ -250,64 +250,87 @@ bar 2 while weights (blue) stay fixed. Then bar 3 shows int4 shrinking the
 weights and freeing space.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{GPU memory hierarchy: HBM, L2 cache, SRAM}
-  \vspace{0.2em}
-  \begin{center}
-    \begin{tikzpicture}[
-      font=\scriptsize,
-      lvl/.style={rectangle, rounded corners=2pt, minimum height=0.55cm,
-                  inner xsep=4pt, inner ysep=2pt, font=\scriptsize},
-      ar/.style={-{Latex[length=1.5mm]}, black!35, thick},
-    ]
-    % SRAM (registers + shared memory)
-    \node[lvl, draw=good!60, fill=good!12, minimum width=3.0cm] (sram)
-      at (0, 2.0) {\textbf{SRAM} (registers + shared mem)};
-    \node[font=\tiny, black!55, align=left, anchor=west] at (2.2, 2.0)
-      {$\sim$20\,MB \quad $\sim$19\,TB/s \quad on-chip};
+\begin{frame}{GPU memory hierarchy and arithmetic intensity}
+  \vspace{-0.2em}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      \begin{center}
+        \begin{tikzpicture}[
+          font=\scriptsize,
+          lvl/.style={rectangle, rounded corners=2pt, minimum height=0.45cm,
+                      inner xsep=3pt, inner ysep=1.5pt, font=\tiny\bfseries},
+          ar/.style={-{Latex[length=1.2mm]}, black!30},
+        ]
+        \node[lvl, draw=good!60, fill=good!12, minimum width=2.2cm] (sram)
+          at (0, 2.1) {Registers + Shared Mem};
+        \node[font=\tiny, black!55, anchor=west] at (1.5, 2.1)
+          {${\sim}$256\,KB/SM \; ${\sim}$33\,TB/s};
 
-    % L2 cache
-    \node[lvl, draw=accent!60, fill=accent!10, minimum width=4.0cm] (l2)
-      at (0, 1.0) {\textbf{L2 cache}};
-    \node[font=\tiny, black!55, align=left, anchor=west] at (2.7, 1.0)
-      {$\sim$50\,MB \quad $\sim$6\,TB/s \quad on-chip};
+        \node[lvl, draw=accent!60, fill=accent!10, minimum width=3.2cm] (l2)
+          at (0, 1.3) {L2 cache};
+        \node[font=\tiny, black!55, anchor=west] at (2.0, 1.3)
+          {50\,MB \; ${\sim}$12\,TB/s};
 
-    % HBM (VRAM)
-    \node[lvl, draw=warn!60, fill=warn!10, minimum width=6.0cm] (hbm)
-      at (0, 0) {\textbf{HBM / VRAM}};
-    \node[font=\tiny, black!55, align=left, anchor=west] at (3.7, 0)
-      {24--80\,GB \quad 1--3\,TB/s \quad off-chip};
+        \node[lvl, draw=warn!60, fill=warn!10, minimum width=4.4cm] (hbm)
+          at (0, 0.5) {HBM / VRAM};
+        \node[font=\tiny, black!55, anchor=west] at (2.7, 0.5)
+          {24--80\,GB \; 1.8--3.4\,TB/s};
 
-    % Host RAM
-    \node[lvl, draw=black!30, fill=black!5, minimum width=8.0cm] (host)
-      at (0, -1.0) {\textbf{Host RAM (CPU)}};
-    \node[font=\tiny, black!55, align=left, anchor=west] at (4.7, -1.0)
-      {64--512\,GB \quad $\sim$50\,GB/s via PCIe};
+        \node[lvl, draw=black!30, fill=black!5, minimum width=5.6cm] (host)
+          at (0, -0.3) {Host RAM};
+        \node[font=\tiny, black!55, anchor=west] at (3.3, -0.3)
+          {${\sim}$50\,GB/s (PCIe)};
 
-    \draw[ar] (sram) -- (l2);
-    \draw[ar] (l2) -- (hbm);
-    \draw[ar] (hbm) -- (host);
+        \draw[ar] (sram)--(l2); \draw[ar] (l2)--(hbm); \draw[ar] (hbm)--(host);
+        \node[font=\tiny, black!35, rotate=90] at (-3.2, 0.9) {faster $\uparrow$};
+        \end{tikzpicture}
+      \end{center}
+      \vspace{0.2em}
+      \scriptsize
+      HBM is off-die, on-package (stacked DRAM). Consumer GPUs use GDDR
+      instead, with 4--8$\times$ less bandwidth. Weights and KV cache live
+      in HBM because they are tens of gigabytes.
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \small
+      \textbf{Arithmetic intensity} determines whether a kernel is
+      compute-bound or bandwidth-bound:
+      \begin{equation*}
+        \text{intensity} = \frac{\text{FLOPs}}{\text{bytes loaded from HBM}}
+      \end{equation*}
 
-    % Labels
-    \node[font=\tiny, black!40, anchor=east] at (-4.5, 2.0) {fast, small};
-    \node[font=\tiny, black!40, anchor=east] at (-4.5, -1.0) {slow, large};
-    \draw[-{Latex[length=1.5mm]}, black!25] (-4.5, 1.7) -- (-4.5, -0.7);
-    \end{tikzpicture}
-  \end{center}
-  \vspace{0.3em}
-  \small
-  An 8B model in fp16 occupies 16\,GB. The L2 cache holds $\sim$50\,MB.
-  Each decode step reads all 16\,GB of weights from HBM because the weights
-  do not fit in any faster level. Decode speed $=$ HBM bandwidth $\div$
-  weight bytes.
+      \vspace{0.3em}
+      \scriptsize
+      \begin{tabular}{@{}lr@{}}
+        \toprule
+        H100 SXM5 & \\
+        \midrule
+        BF16 peak & 990 TFLOP/s \\
+        HBM3 bandwidth & 3.35 TB/s \\
+        \midrule
+        \textbf{break-even intensity} & \emphc{$\approx$296 FLOP/byte} \\
+        \bottomrule
+      \end{tabular}
+
+      \vspace{0.4em}
+      \small
+      Below 296 FLOP/byte, the GPU waits on HBM. Decode at batch 1 runs
+      at $\approx$1 FLOP/byte.
+    \end{column}
+  \end{columns}
 \end{frame}
-\note{The hierarchy explains why decode is bandwidth-bound: the weights are
-300$\times$ larger than the L2 cache, so every token pays the full HBM read.
-Batching amortizes this read across multiple users. Quantization shrinks the
-weights so each read moves fewer bytes. Kernel fusion reduces the number of
-round-trips by combining operations in SRAM.
-
-RTX 5090: 32 GB GDDR7, 1.79 TB/s. A100 80GB: 80 GB HBM2e, 2.0 TB/s.
-H100 80GB: 80 GB HBM3, 3.35 TB/s. These are spec-sheet peaks.}
+\note{The arithmetic intensity number explains every optimization in this talk:
+\begin{itemize}
+\item Quantization: halves the bytes, doubles the intensity.
+\item Batching: B tokens share one weight read, intensity $\approx$ B.
+\item Kernel fusion: fewer HBM round-trips, more work per byte in SRAM.
+\item FlashAttention: avoids materializing the $O(N^2)$ attention matrix in HBM
+      by tiling into shared memory.
+\end{itemize}
+Hardware numbers (spec-sheet peaks):
+RTX 5090: 32 GB GDDR7, 1.79 TB/s, 419 BF16 TFLOP/s.
+A100 80GB: 80 GB HBM2e, 2.0 TB/s, 312 BF16 TFLOP/s.
+H100 SXM5: 80 GB HBM3, 3.35 TB/s, 990 BF16 TFLOP/s.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{Prefill is compute-bound. Decode is bandwidth-bound.}
@@ -348,14 +371,14 @@ H100 80GB: 80 GB HBM3, 3.35 TB/s. These are spec-sheet peaks.}
   \vspace{0.3em}
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
-      \small \textbf{Prefill} reads the weights once and processes all
-      prompt tokens in one batch of large matrix multiplies. The GPU
-      arithmetic units are the bottleneck.
+      \small \textbf{Prefill} reads the weights once for all $N$ prompt
+      tokens. Intensity $\approx N$ FLOP/byte. At $N{=}4000$, the
+      tensor cores are the bottleneck. \emph{Compute-bound.}
     \end{column}
     \begin{column}{0.48\textwidth}
-      \small \textbf{Decode} reads the weights once \emph{per output token}.
-      The GPU spends most of its time moving bytes from HBM, and the
-      arithmetic units are idle.
+      \small \textbf{Decode} reads the weights once per output token.
+      At batch $B$, intensity $\approx B$ FLOP/byte. At $B{=}1$,
+      tensor cores run at $<$1\% of peak. \emph{Bandwidth-bound.}
     \end{column}
   \end{columns}
 \end{frame}
