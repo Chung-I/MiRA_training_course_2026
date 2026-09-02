@@ -64,7 +64,7 @@
 
 % =====================================================================
 \title{Graph Neural Networks}
-\subtitle{Each node makes a summary of its neighbors, then updates itself}
+
 \author{\CJK{仲翊}}
 \date{MiRA Training Course 2026 \quad$\cdot$\quad 9/3, R546}
 % =====================================================================
@@ -87,8 +87,8 @@ CHECKPOINT: 17:20 here.}
     \item Each node makes a \alert{summary of its neighbors}, then updates itself.
     \item Each layer extends the view of a node by \alert{one hop}. Two or three
           layers is the usual optimum.
-    \item You will spend most of your time on one choice: \alert{what the
-          nodes and the edges are}.
+    \item \alert{Graph construction} decides how a GNN performs. The layer
+          architecture matters less.
   \end{enumerate}
 \end{frame}
 \note{Say the promise aloud: "30 minutes, 3 ideas, I stop at 17:50." Tell them
@@ -304,10 +304,10 @@ changes on screen.}
   \end{itemize}
   \vfill
   \begin{center}\small\color{dim}
-    Padding fails on the first scene that exceeds the maximum, and truncation discards real objects.
+    A scene with more objects than the maximum breaks a padded input. Truncation discards real objects.
   \end{center}
 \end{frame}
-\note{This is a fast slide: 40 seconds. The audience already believes this one.}
+\note{40 seconds. The audience already believes this one.}
 
 % --- 11 ----------------------------------------------------------------
 \begin{frame}{``Isn't attention already a graph?'' Yes, a fully-connected one}
@@ -530,7 +530,7 @@ an architecture. Do not take
 answers. There is no time.}
 
 % --- 17 ----------------------------------------------------------------
-\begin{frame}{Graph construction is the design decision that matters most}
+\begin{frame}{Graph construction: k-NN, radius, or fully connected}
   \vspace{-0.2em}
   \begin{columns}[T]
     \begin{column}{0.50\textwidth}
@@ -772,7 +772,7 @@ is the line the last twenty minutes were about.
 If someone asks about libraries: PyTorch Geometric. If you need heterogeneous graphs, use DGL.}
 
 % --- 22 ----------------------------------------------------------------
-\begin{frame}[fragile]{Run it yourself: everything above, on a free Colab CPU}
+\begin{frame}[fragile]{The notebook runs on a free Colab CPU}
   \vspace{0.5em}
   \begin{center}
     \small\texttt{\href{https://colab.research.google.com/github/Chung-I/MiRA_training_course_2026/blob/main/notebooks/gnn_demo.ipynb}{colab.research.google.com/github/Chung-I/MiRA\_training\_course\_2026/}}\\
@@ -786,7 +786,7 @@ If someone asks about libraries: PyTorch Geometric. If you need heterogeneous gr
       read each line. PyTorch Geometric appears once, at the end, as an option.
       \vspace{0.8em}
 
-      \textbf{Right now, live:}
+      \textbf{Demos in the notebook:}
       \begin{itemize}
         \item \alert{Demo 4}: node features are \emph{pure noise}
         \item \alert{Demo 5}: k-NN at $k = 3, 8, 20$
@@ -839,10 +839,11 @@ CHECKPOINT: back on slides by 17:44.}
   \end{itemize}
   \vfill
   \begin{center}\large
-    GNNs win when you \alert{know the sparse structure before training}.
+    A GNN outperforms a Transformer when the \alert{interaction graph is
+    sparse, known, and too large to learn from data}.
   \end{center}
 \end{frame}
-\note{This slide makes the previous twenty minutes trustworthy.
+\note{This slide earns trust by showing when not to use the method.
 
 Expected question: "are GNNs still relevant now that everything is a
 transformer?" Answer: RoboBallet is from 2025, and the learned-simulator line
@@ -850,7 +851,7 @@ is active. If the interaction structure is known and sparse, an encoded graph
 beats a learned graph, especially with limited data.}
 
 % --- 24 ----------------------------------------------------------------
-\begin{frame}{Is my problem a graph? A 3-question checklist}
+\begin{frame}{When is a problem a graph?}
   \vspace{1.2em}
   \begin{enumerate}
     \setlength{\itemsep}{1.3em}
@@ -860,7 +861,7 @@ beats a learned graph, especially with limited data.}
   \end{enumerate}
   \vspace{1.4em}
   \begin{center}\large
-    \textbf{Two yeses} $\Rightarrow$ try a GNN.
+    \textbf{Two yeses} $\Rightarrow$ a GNN is worth testing.
   \end{center}
 \end{frame}
 \note{Slow down. The whole talk exists so they can recognize when their own
@@ -873,10 +874,10 @@ Give them five seconds of silence to test their own project against it.}
   \vspace{0.2em}
   \begin{center}
     \large
-    A GNN is one idea repeated: \alert{each node makes a summary of its
-    neighbors, then updates itself.}\\[0.8em]
-    You will spend most of your time on one choice: \alert{what the nodes and
-    the edges are.}
+    A GNN repeats one operation: \alert{each node aggregates its neighbors,
+    then updates its own vector.}\\[0.8em]
+    \alert{Graph construction} decides performance. The layer architecture
+    matters less.
   \end{center}
   \vspace{1.1em}
   \hrule

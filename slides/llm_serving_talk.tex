@@ -68,7 +68,7 @@
 % \setbeameroption{show notes on second screen=right}
 
 \title{Fast, efficient, VRAM-friendly LLM serving}
-\subtitle{Memory decides serving cost, and you can compute it in advance}
+
 \author{\CJK{仲翊}{Chung-Yi}}
 \institute{MiRA Training Course 2026}
 \date{9/4, 10:20--11:00 \quad R546}
@@ -82,32 +82,27 @@ deployment on paper. Inference only, no architecture. Say the end time: 11:00.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{``Put this model on our machine.'' Does it fit?}
-  \begin{block}{Your advisor, some time in the next twelve months}
-    ``Put this model on our machine so the lab can use it.''
-  \end{block}
   \vspace{0.5em}
-  You have \emphc{one GPU}. The model is \emphc{70B parameters}.
+  \emphc{One GPU}. \emphc{70B parameters}.
   \begin{itemize}
     \item Does it fit?
     \item If it fits, how many people can use it at once?
     \item If it is too slow, what do you change \emph{first}?
   \end{itemize}
   \vspace{0.6em}
-  \uncover<2->{\warnc{Most people answer this by trial and error.}}
 \end{frame}
 \note{\textbf{0:30.} Show of hands: who has downloaded a model and hoped that it
 loads? Everyone.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{Serving cost is arithmetic on two numbers}
-  \begin{alertblock}{The one thing}
+  \begin{alertblock}{}
     \textbf{Memory decides serving cost.}
     Compute the VRAM budget and the memory-bandwidth ceiling. Then each
     deployment decision (quantize, batch, shrink, or buy another GPU)
     follows from arithmetic.
   \end{alertblock}
   \vspace{0.4em}
-  Three questions, three pieces of arithmetic:
   \begin{enumerate}
     \item \textbf{Does it fit?} $\rightarrow$ the VRAM budget
     \item \textbf{How fast can it go?} $\rightarrow$ the bandwidth ceiling
@@ -118,7 +113,7 @@ loads? Everyone.}
 arrives in Movement 1.}
 
 % -------------------------------------------------------------------------
-\begin{frame}[fragile]{Every number on these slides is a cell you can run}
+\begin{frame}[fragile]{A Colab notebook computes every number in this talk}
   \begin{center}
     {\small\url{github.com/Chung-I/MiRA_training_course_2026}}\\[0.3em]
     {\footnotesize click the Colab badge next to
@@ -167,7 +162,7 @@ watch first and run it on the train home.}
           A 2\,GB budget covers it.
   \end{itemize}
   \vspace{0.6em}
-  \uncover<2->{The weights and the KV cache set the budget.}
+  \uncover<2->{Weights are a fixed cost. The KV cache grows with each concurrent user.}
 \end{frame}
 \note{\textbf{3:30.} Fragmentation gets a whole slide of its own later.
 PagedAttention exists to remove it.}
@@ -202,7 +197,7 @@ calculation in machine learning, and most people skip it before they
 download.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{The KV cache formula, which most people skip}
+\begin{frame}{The KV cache formula}
   \begin{equation*}
     \underbrace{\text{KV bytes per token}}_{\text{per user, per token}}
     \;=\;
@@ -219,7 +214,7 @@ download.}
     \item You pay it \emph{once per concurrent user}.
   \end{itemize}
   \vspace{0.6em}
-  \emphc{Four numbers, all in the \texttt{config.json} of the model.}
+  \emphc{layers, kv\_heads, head\_dim, bytes per value --- all in \texttt{config.json}.}
 \end{frame}
 \note{\textbf{5:30.} The one fact about attention I assume: decoding needs the keys
 and values of every previous token, so you keep them.}
@@ -339,7 +334,7 @@ End of Movement 1. Target: 10 minutes.}
   \vspace{1.0em}
   \begin{center}
     \begin{minipage}{0.9\textwidth}
-      \begin{block}{The corollary you can charge money for}
+      \begin{block}{The cost asymmetry}
         A 10k-token \emph{prompt} is cheap and 10k \emph{output} tokens are
         expensive. Prompt tokens run in parallel. Output tokens wait in a queue.
       \end{block}
@@ -399,7 +394,8 @@ is 4x cheaper.}
     \end{tabular}
   \end{center}
   \vspace{0.4em}
-  \emphc{A serving engine exists to close that 90\% gap.}
+  \emphc{vLLM or SGLang closes most of that 90\% gap with continuous
+  batching and PagedAttention.}
 \end{frame}
 \note{\textbf{12:30.} Run this live. The 1.008 ratio earns their trust in the
 arithmetic. The 9.4\% earns you Movement 3. \texttt{generate()} is a
@@ -648,8 +644,8 @@ that your engine supports for your card.}
     \begin{minipage}{0.88\textwidth}
       \begin{block}{Why it is nearly free}
         Those KV blocks already exist in memory. PagedAttention already
-        lets two requests point at the same physical block. Prefix caching is
-        what paging \emph{buys} you.
+        lets two requests point at the same physical block. PagedAttention makes prefix
+        caching possible, because two requests can share the same physical blocks.
       \end{block}
     \end{minipage}
   \end{center}
@@ -800,9 +796,8 @@ repeat the older description, and it is out of date.}
           $\sim$4$\times$ faster \emph{per token}.
     \item At batch 1, \texttt{generate()} reaches \textbf{9\%} of this model's
           bandwidth ceiling. vLLM reaches \textbf{40\%}.
-    \item \textbf{This table does not rank the engines.} On a 0.5\,B model the
-          measurement is dominated by dispatch overhead, and TRT-LLM is far
-          outside its design envelope.
+    \item \textbf{On a 0.5\,B model, dispatch overhead dominates.}
+          TRT-LLM is far outside its design envelope at this scale.
   \end{itemize}
 \end{frame}
 \note{\textbf{29:00.} These are our own numbers, from two days ago. The 4$\times$ is the
@@ -845,7 +840,7 @@ slow engine. Neither is true. A wrong number is more dangerous than a crash, bec
 a crash stops you.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{Start with vLLM. Move only for a reason.}
+\begin{frame}{vLLM is the default. SGLang and TRT-LLM solve different problems.}
   \vspace{0.5em}
   \begin{center}
     \begin{tabular}{ll}
@@ -973,7 +968,7 @@ CUDA graph replaces all of it with a single launch.}
         Quantization, kernel fusion and removal of dispatch overhead:
         \textbf{the same three ideas as the LLM half of this talk,}
         aimed at a batch of one.\\[0.3em]
-        So serving is worth learning even if you only run robots.
+        Serving techniques apply to robot policies at batch 1.
       \end{alertblock}
     \end{minipage}
   \end{center}
@@ -1144,7 +1139,7 @@ seconds and let them take it. Then give the take-home.}
   \end{center}
   \vspace{0.8em}
   \begin{center}\footnotesize
-    Leave this slide up. Parts 1--5 run on a free CPU runtime.
+    Parts 1--5 run on a free CPU runtime.
   \end{center}
 \end{frame}
 \note{\textbf{37:30 to 40:00 for questions.} If the room is quiet, leave the checklist slide up
@@ -1301,7 +1296,7 @@ is a proof of zero quality loss. If you have 30 seconds, use them here.}
 the least likely to be necessary.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{Backup: the questions that come up}
+\begin{frame}{Backup: common questions}
   \small
   \begin{itemize}
     \item \textbf{Self-host or API?} API, unless sustained high volume, a
@@ -1328,7 +1323,7 @@ the least likely to be necessary.}
 \note{Do not answer these on the main slides. Wait for the questions.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{Sources for every number on these slides}
+\begin{frame}{Sources}
   \small
   \begin{itemize}
     \item \textbf{Llama-3-8B} 32 layers / 8 KV heads / head\_dim 128;
