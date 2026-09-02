@@ -394,11 +394,8 @@ for the next 25 minutes.
 If nobody answers within five seconds, answer it yourself and move on.}
 
 % --- 10 ---------------------------------------------------------------
-\begin{frame}{Flattening fails: relabel the nodes and the answer changes}
+\begin{frame}{A GNN produces the same output regardless of node ordering}
   \vspace{0.4em}
-  An MLP takes six objects on a table as one flattened vector.
-  \vspace{0.8em}
-
   \begin{center}
     \begin{tikzpicture}[scale=0.95, every node/.style={transform shape},
       box/.style={rectangle, draw=dim, minimum width=7mm, minimum height=7mm,
@@ -410,36 +407,45 @@ If nobody answers within five seconds, answer it yourself and move on.}
         \node[box, fill=acc!10, draw=acc] at (\i*0.78, 0) {\lab};
       \node[font=\scriptsize, color=acc] at (-1.15,0) {order B};
       \node[align=left, font=\small, anchor=west] at (5.1,0.45)
-        {\alert{The same scene} in a different order\\ is a different vector, so the MLP\\ gives a different answer.};
+        {Both orderings describe the\\ same scene of six objects.};
     \end{tikzpicture}
   \end{center}
   \vspace{0.6em}
-  The MLP has to learn $n!$ copies of the same function. A GNN sums over
-  neighbors, and a sum \alert{ignores order}.
+  A GNN aggregates neighbors with a sum, mean, or max. Because these
+  functions \alert{ignore the order of their inputs}, the output is the same
+  for any permutation of the nodes. This property is called
+  \alert{permutation invariance} (for graph-level predictions) or
+  \alert{permutation equivariance} (for node-level predictions, where the
+  output permutes with the input).
 \end{frame}
-\note{The PyG Introduction tutorial shows this: renumber the nodes in a small
-graph and the MLP output changes, while the GCN output stays the same.}
+\note{Permutation invariance: $f(\pi(G)) = f(G)$ for graph-level output.
+Permutation equivariance: $f(\pi(G)) = \pi(f(G))$ for node-level output, meaning
+each node's output follows that node's identity, not its position in the vector.
+
+The PyG Introduction tutorial demonstrates this: renumber the nodes and the
+GCN output stays the same, while an MLP output changes.}
 
 % --- 11 ---------------------------------------------------------------
-\begin{frame}{Flattening fails: the number of objects changes}
-  \vspace{1.2em}
-  \begin{center}
-    \Large
-    A fixed input dimension cannot take a \alert{variable number of objects}.
-  \end{center}
-  \vspace{1.4em}
+\begin{frame}{A GNN accepts a variable number of nodes and edges}
+  \vspace{1.0em}
+  A GNN represents its input as a set of nodes and an edge list. Adding or
+  removing a node changes the set, not a fixed-size vector, so the same
+  trained weights run on inputs of any size.
+  \vspace{1.0em}
   \begin{itemize}
     \setlength{\itemsep}{0.7em}
-    \item A DPI-Net scene has one node per particle, and that count differs per object.
-    \item A learned simulator is tested on more particles than any training scene had.
-    \item A scene graph has one node per object in the room, and the room changes.
+    \item GNS trained on scenes with thousands of particles and generalized to
+          $10\times$ more particles at test time. \arx{2002.09405}
+    \item DPI-Net uses one node per particle, and that count differs per object
+          and per timestep (fluids gain and lose particles). \arx{1810.01566}
+    \item A scene graph has one node per detected object, and the number of
+          objects in the room changes between scenes. \arx{2002.06289}
   \end{itemize}
-  \vfill
-  \begin{center}\small\color{dim}
-    A scene with more objects than the maximum breaks a padded input. Truncation discards real objects.
-  \end{center}
 \end{frame}
-\note{40 seconds. The audience already believes this one.}
+\note{The mechanism: message passing applies the same learned function to each
+node and its neighbors, so the number of nodes is not a parameter of the model.
+An MLP takes a fixed-length vector, so the number of objects is baked into the
+architecture.}
 
 % --- 12 ---------------------------------------------------------------
 \begin{frame}{A Transformer is a GNN on the complete graph}
