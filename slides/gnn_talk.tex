@@ -308,41 +308,13 @@ grows one hop per layer.
 Most of the room already has the CNN receptive-field picture. Give them
 the mapping and stop.}
 
-% --- 8 ----------------------------------------------------------------
-\begin{frame}{GCN, GraphSAGE, GAT differ only in the AGG box}
-  \vspace{0.6em}
-  \begin{center}
-  \small
-  \begin{tabular}{@{}lll@{}}
-    \toprule
-    & \textbf{AGG} & \textbf{Use it when} \\
-    \midrule
-    \textbf{GCN}       & normalized mean & first. It is the baseline \\[0.5em]
-    \textbf{GraphSAGE} & sample neighbors, then mean/max
-                       & the graph is large, or new nodes\\
-                       & & appear at test time \\[0.5em]
-    \textbf{GAT}       & attention-weighted sum
-                       & some neighbors matter more than others \\
-    \bottomrule
-  \end{tabular}
-  \end{center}
-  \vfill
-  \begin{center}\large
-    GCN, GraphSAGE and GAT share MSG and UPDATE, and differ only in \alert{AGG}.
-  \end{center}
-\end{frame}
-\note{Say it aloud: they differ in that one box. Most GNN variants are this
-single choice. This slide removes the fear of the literature.
-
-Do not discuss expressiveness or the WL test. If someone asks, give one sentence.}
-
 
 
 % =========================================================================
 % Failure modes and code
 % =========================================================================
 
-% --- 9 ----------------------------------------------------------------
+% --- 8 ----------------------------------------------------------------
 \begin{frame}{Deeper is worse: over-smoothing after 3 layers}
   \vspace{0.2em}
   \begin{columns}[c]
@@ -466,7 +438,7 @@ is the line the last twenty minutes were about.
 
 If someone asks about libraries: PyTorch Geometric. If you need heterogeneous graphs, use DGL.}
 
-% --- 10 ---------------------------------------------------------------
+% --- 9 ----------------------------------------------------------------
 \begin{frame}{PyTorch Geometric tutorials on Colab}
   \vspace{0.2em}
   \begin{center}\small
@@ -525,7 +497,7 @@ CHECKPOINT: back on slides by 17:44.}
 % Movement 3: GNNs and Transformers
 % =========================================================================
 
-% --- 11 ---------------------------------------------------------------
+% --- 10 ---------------------------------------------------------------
 \begin{frame}{What does a CNN assume? What does a Transformer assume?}
   \vspace{1.4em}
   \begin{columns}[T]
@@ -550,7 +522,7 @@ for the next 25 minutes.
 
 If nobody answers within five seconds, answer it yourself and move on.}
 
-% --- 12 ---------------------------------------------------------------
+% --- 11 ---------------------------------------------------------------
 \begin{frame}{Flattening fails: relabel the nodes and the answer changes}
   \vspace{0.4em}
   An MLP takes six objects on a table as one flattened vector.
@@ -577,7 +549,7 @@ If nobody answers within five seconds, answer it yourself and move on.}
 \note{The PyG Introduction tutorial shows this: renumber the nodes in a small
 graph and the MLP output changes, while the GCN output stays the same.}
 
-% --- 13 ---------------------------------------------------------------
+% --- 12 ---------------------------------------------------------------
 \begin{frame}{Flattening fails: the number of objects changes}
   \vspace{1.2em}
   \begin{center}
@@ -598,7 +570,7 @@ graph and the MLP output changes, while the GCN output stays the same.}
 \end{frame}
 \note{40 seconds. The audience already believes this one.}
 
-% --- 14 ---------------------------------------------------------------
+% --- 13 ---------------------------------------------------------------
 \begin{frame}{A Transformer is a GNN on the complete graph}
   \vspace{0.4em}
   \begin{center}
@@ -693,7 +665,7 @@ arXiv:2106.03672 (Amorpheus), arXiv:2408.16932 (PT v3).}
 % Close
 % =========================================================================
 
-% --- 15 ---------------------------------------------------------------
+% --- 14 ---------------------------------------------------------------
 \begin{frame}{When \emph{not} to use a GNN}
   \vspace{0.8em}
   \begin{itemize}
@@ -724,7 +696,7 @@ MeshGraphNets), and multi-robot coordination (Li \& Prorok) all held with
 GNNs. The field has converged on hybrids (GraphGPS), but T\"onshoff et al.\
 (LoG 2023) showed that tuned MPNNs close most of the reported gap.}
 
-% --- 16 ---------------------------------------------------------------
+% --- 15 ---------------------------------------------------------------
 \begin{frame}{When is a problem a graph?}
   \vspace{1.2em}
   \begin{enumerate}
@@ -743,7 +715,7 @@ problem is a graph.
 
 Give them five seconds of silence to test their own project against it.}
 
-% --- 17 ---------------------------------------------------------------
+% --- 16 ---------------------------------------------------------------
 \begin{frame}{Take-home}
   \vspace{0.2em}
   \begin{center}
@@ -775,7 +747,7 @@ Give them five seconds of silence to test their own project against it.}
 
 CHECKPOINT: 17:48. You promised 17:50. Finish early.}
 
-% --- 18 ---------------------------------------------------------------
+% --- 17 ---------------------------------------------------------------
 \begin{frame}[plain]
   \vspace{2.2em}
   \begin{center}
