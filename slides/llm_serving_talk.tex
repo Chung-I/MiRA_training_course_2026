@@ -490,29 +490,52 @@ Each tool in the toolbox shrinks the weights term or the denominator.}
 
 \begin{frame}{Prefill is compute-bound. Decode is bandwidth-bound.}
   \llmdiagK
+  \vspace{-0.2em}
+  \begin{center}
+    \begin{tikzpicture}[
+      font=\scriptsize,
+      phase/.style={rectangle, rounded corners=2pt, minimum height=0.7cm,
+                    inner xsep=4pt, inner ysep=2pt, font=\scriptsize\bfseries},
+      ar/.style={-{Latex[length=1.5mm]}, black!40, thick},
+      wt/.style={rectangle, draw=accent!50, fill=accent!10, rounded corners=1pt,
+                 minimum height=0.3cm, inner xsep=2pt, font=\tiny},
+    ]
+    % Prefill
+    \node[phase, draw=good!60, fill=good!12, minimum width=4cm] (pf)
+      at (0, 0) {Prefill};
+    \node[font=\tiny, good!70, align=center] at (0, -0.65)
+      {all prompt tokens in parallel\\compute-bound: ALUs busy};
+    \node[wt] at (0, 0.7) {Weights (read once)};
+
+    % Arrow
+    \draw[ar] (2.3, 0) -- (3.5, 0);
+    \node[font=\tiny, black!50] at (2.9, 0.2) {KV stored};
+
+    % Decode
+    \node[phase, draw=warn!60, fill=warn!12, minimum width=4cm] (dc)
+      at (5.8, 0) {Decode};
+    \node[font=\tiny, warn!70, align=center] at (5.8, -0.65)
+      {one token at a time\\bandwidth-bound: reading weights};
+    \node[wt] at (5.8, 0.7) {Weights (read per token)};
+
+    % Token outputs
+    \node[font=\tiny, black!40] at (8.5, 0) {$t_1, t_2, t_3, \ldots$};
+    \draw[ar] (7.9, 0) -- (8.2, 0);
+    \end{tikzpicture}
+  \end{center}
+  \vspace{0.3em}
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
-      \textbf{Prefill} (your prompt)\\[0.3em]
-      \small All prompt tokens go through the network \emph{in parallel}.
-      Big matrix multiplies keep the arithmetic units of the GPU busy.
-      \emph{Compute-bound.}
+      \small \textbf{Prefill} reads the weights once and processes all
+      prompt tokens in one batch of large matrix multiplies. The GPU
+      arithmetic units are the bottleneck.
     \end{column}
     \begin{column}{0.48\textwidth}
-      \textbf{Decode} (the answer)\\[0.3em]
-      \small One token at a time, in sequence. For each token, the GPU reads
-      \emph{every weight} out of HBM. The GPU spends its time on byte
-      traffic. \emph{Bandwidth-bound.}
+      \small \textbf{Decode} reads the weights once \emph{per output token}.
+      The GPU spends most of its time moving bytes from HBM, and the
+      arithmetic units are idle.
     \end{column}
   \end{columns}
-  \vspace{1.0em}
-  \begin{center}
-    \begin{minipage}{0.9\textwidth}
-      \begin{block}{The cost asymmetry}
-        A 10k-token \emph{prompt} is cheap and 10k \emph{output} tokens are
-        expensive. Prompt tokens run in parallel. Output tokens wait in a queue.
-      \end{block}
-    \end{minipage}
-  \end{center}
 \end{frame}
 \note{\textbf{10:00.} This fact explains the rest of the talk. The sentence to keep
 from Movement 2: ``decoding reads all the weights, once per token''.}
@@ -557,20 +580,22 @@ is 4x cheaper.}
     \end{tabular}
   \end{center}
   \vspace{0.6em}
-  Then, how close to the ceiling does a plain for-loop get?
+  Then, how close to the ceiling does each approach get at batch 1?
   \begin{center}\small
-    \begin{tabular}{lr}
+    \begin{tabular}{lrr}
       \toprule
-      bandwidth ceiling & 1811.6 tok/s \\
-      HuggingFace \texttt{generate()} decode & \warnc{169.9 tok/s} \\
+      & tok/s & \textbf{efficiency} \\
       \midrule
-      \textbf{efficiency} & \warnc{9.4\% of the hardware} \\
+      bandwidth ceiling & 1811.6 & 100\% \\
+      \midrule
+      HuggingFace \texttt{generate()} & \warnc{169.9} & \warnc{9.4\%} \\
+      vLLM & \emphc{726} & \emphc{40.1\%} \\
+      SGLang & \goodc{701} & \goodc{38.7\%} \\
       \bottomrule
     \end{tabular}
   \end{center}
-  \vspace{0.4em}
-  \emphc{vLLM reaches 40\% of the ceiling at batch 1 (4.3$\times$ faster
-  than \texttt{generate()}) with continuous batching and PagedAttention.}
+  \vspace{0.3em}
+  {\small RTX 5090, Qwen2.5-0.5B, fp16, batch 1, 128 output tokens.}
 \end{frame}
 \note{\textbf{12:30.} Run this live. The 1.008 ratio earns their trust in the
 arithmetic. The 9.4\% earns you Movement 3. \texttt{generate()} is a
@@ -636,7 +661,7 @@ End of Movement 2. Target: 18 minutes.}
 
 \begin{frame}{The toolbox, ranked by payoff}
   \begin{enumerate}\small
-    \item \emphc{Use a real serving engine.} vLLM / SGLang / TensorRT-LLM.
+    \item \emphc{Use a real serving engine.} vLLM or SGLang.
           One-line change, largest single payoff.
     \item \emphc{Quantize the weights.} int4/int8/FP8. $\approx\frac14$ the VRAM,
           several times the decode speed.
@@ -978,56 +1003,21 @@ of Movement 2: prefill is compute-bound, decode is bandwidth-bound, so give
 them different machines. One sentence, then continue.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{TensorRT-LLM: compile-time specialization per model and GPU}
-  \llmdiagK
-  The other two \emph{interpret} your model at run time. TensorRT-LLM can
-  \emphc{compile an engine} first: kernels fused, each GEMM auto-tuned for your
-  exact shapes and your exact GPU.
-  \vspace{0.5em}
-  \begin{itemize}\small
-    \item In-flight batching, paged KV cache, custom attention backends.
-    \item FP8 on Hopper, FP4 on Blackwell.
-    \item TP / PP / EP / DP parallelism.
-  \end{itemize}
-  \vspace{0.6em}
-  \begin{center}
-    \begin{minipage}{0.92\textwidth}
-      \begin{alertblock}{Two things we found by running it}
-        \textbf{1.} Version 1.2.1 defaults to a \textbf{PyTorch backend}. The
-        compile step is now a path you opt into.
-
-        \vspace{0.3em}
-        \textbf{2.} If you compile, you compile \textbf{per model, per shape
-        range, per GPU}. When any of the three changes, you rebuild. You trade a
-        build step in your pipeline for the last of the performance.
-      \end{alertblock}
-    \end{minipage}
-  \end{center}
-\end{frame}
-\note{\textbf{27:00.} The tradeoff of the section: specialization
-versus flexibility. A research lab changes models weekly and must not pay a
-build step. A product on fixed hardware can.
-
-Do not describe the engine build as a requirement of TensorRT-LLM. We
-tested it: 1.2.1 starts a PyTorch runtime by default. Most blog posts still
-repeat the older description, and it is out of date.}
-
-% -------------------------------------------------------------------------
-\begin{frame}{Measured throughput: HF, vLLM, SGLang, TRT-LLM on RTX 5090}
+\begin{frame}{Measured throughput: HF, vLLM, SGLang on RTX 5090}
   \small
   Same RTX 5090, same Qwen2.5-0.5B in fp16, same 128 output tokens.
   Total tok/s across all concurrent requests.
   \vspace{0.4em}
   \begin{center}
-    \begin{tabular}{rrrrr}
+    \begin{tabular}{rrrr}
       \toprule
       \textbf{batch} & \textbf{HF \texttt{generate()}} & \textbf{vLLM} &
-      \textbf{SGLang} & \textbf{TRT-LLM} \\
+      \textbf{SGLang} \\
       \midrule
-      1  & 165   & \textbf{726}    & 701    & 613 \\
-      8  & 1,275 & \textbf{5,155}  & 4,977  & 3,674 \\
-      16 & 2,548 & \textbf{9,880}  & 9,625  & 5,446 \\
-      64 & 9,782 & \textbf{37,265} & 32,523 & 9,251 \\
+      1  & 165   & \textbf{726}    & 701 \\
+      8  & 1,275 & \textbf{5,155}  & 4,977 \\
+      16 & 2,548 & \textbf{9,880}  & 9,625 \\
+      64 & 9,782 & \textbf{37,265} & 32,523 \\
       \bottomrule
     \end{tabular}
   \end{center}
@@ -1039,7 +1029,6 @@ repeat the older description, and it is out of date.}
     \item At batch 1, \texttt{generate()} reaches \textbf{9\%} of this model's
           bandwidth ceiling. vLLM reaches \textbf{40\%}.
     \item \textbf{On a 0.5\,B model, dispatch overhead dominates.}
-          TRT-LLM is far outside its design envelope at this scale.
   \end{itemize}
 \end{frame}
 \note{\textbf{29:00.} These are our own numbers, from two days ago. The 4$\times$ is the
@@ -1047,7 +1036,7 @@ headline. Stop any "which is best" question fast: on a model this small you
 measure per-request overhead.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{SGLang CUDA graph cliff: a configuration that halves throughput}
+\begin{frame}{SGLang CUDA graph cliff: a default that halves throughput}
   Same SGLang, same machine, one config value changed.
   \vspace{0.4em}
   \begin{center}
@@ -1082,7 +1071,7 @@ slow engine. Neither is true. A wrong number is more dangerous than a crash, bec
 a crash stops you.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{Engine selection: vLLM, SGLang, TensorRT-LLM}
+\begin{frame}{Engine selection: vLLM vs.\ SGLang}
   \vspace{0.5em}
   \begin{center}
     \begin{tabular}{ll}
@@ -1091,15 +1080,11 @@ a crash stops you.}
       \textbf{SGLang} & you live on \emph{shared prefixes} or \emph{structured
                         output} \\
                       & (agents, tool calling, JSON schemas). \\[0.5em]
-      \textbf{TensorRT-LLM} & you ship \emph{fixed hardware at scale} and can
-                        afford the build. \\
       \bottomrule
     \end{tabular}
   \end{center}
   \vspace{1.2em}
   \begin{center}\large
-    TensorRT-LLM is the wrong first choice for a research lab, because the
-    build step repeats for every model change.
   \end{center}
 \end{frame}
 \note{\textbf{28:00.} Be decisive. They came for a recommendation. End of Movement 3b.}
@@ -1348,8 +1333,7 @@ with different execution shapes, so the server schedules them separately.}
 % -------------------------------------------------------------------------
 \begin{frame}{FlashRT: no compile, hand-written kernels, one CUDA graph}
   \llmdiagK
-  The opposite design point from TensorRT-LLM:
-  \emphc{you run it without a compile step or an ONNX export}.
+  \emphc{FlashRT runs without a compile step or an ONNX export}.
   \vspace{0.6em}
   \begin{itemize}
     \item \textbf{Hand-written CUDA kernels} for the memory-bound operations:
@@ -1586,10 +1570,10 @@ first, then the tail of the toolbox. Keep Movements 3b and 3c, because
 the named engines and the robot contrast are what this room will use.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{Backup: none of the three ran from \texttt{pip} on a clean machine}
+\begin{frame}{Backup: vLLM and SGLang pip install issues}
   \small
-  All three install from \texttt{pip}. On an RTX 5090 with no CUDA toolkit,
-  \emphc{none of them served from that install}. All three ran in their official
+  Both install from \texttt{pip}. On an RTX 5090 with no CUDA toolkit,
+  \emphc{neither served from that install}. Both ran in their official
   containers.
   \vspace{0.5em}
   \begin{center}
@@ -1601,7 +1585,6 @@ the named engines and the robot contrast are what this room will use.}
               & \texttt{ninja} not found       & venv \texttt{bin} not on \texttt{PATH} \\
               & compiler/header mismatch       & nvcc 13.3 vs CUDA 13.0 headers \\[0.4em]
       SGLang  & FlashInfer JIT fails           & no \texttt{nvcc}, and the wheel ships only \texttt{ptxas} \\[0.4em]
-      TRT-LLM & \texttt{libmpi.so.40} missing  & links against system OpenMPI \\
       \bottomrule
     \end{tabular}
   \end{center}
@@ -1617,36 +1600,7 @@ the named engines and the robot contrast are what this room will use.}
 venv-bin-on-PATH one is the general trap: it looks like a missing
 dependency, but it is a PATH problem.}
 
-% -------------------------------------------------------------------------
-\begin{frame}{Backup: five TensorRT-LLM configs, none of them helped}
-  \small
-  The flat TRT-LLM curve was worth a look. The resolved config first, then
-  the guesses:
-  \texttt{max\_batch\_size}=2048 (nothing queued), CUDA graphs
-  \emph{already on} for \texttt{bs=[1..32,64,128]}, overlap scheduler already on.
-  \vspace{0.4em}
-  \begin{center}
-    \begin{tabular}{lrr}
-      \toprule
-      \textbf{config} & \textbf{batch 64} & \textbf{vs baseline} \\
-      \midrule
-      baseline                     & 9,291 & 100\% \\
-      FlashInfer attention         & 8,597 & \warnc{93\%} \\
-      \texttt{max\_num\_tokens}=32k & 9,318 & 100\% \\
-      chunked prefill              & 9,071 & 98\% \\
-      KV fraction 0.7              & 9,271 & 100\% \\
-      \bottomrule
-    \end{tabular}
-  \end{center}
-  \vspace{0.5em}
-  \textbf{Per-request overhead} dominates a 0.5\,B model that emits 128
-  tokens, and no flag touches it.
-  \vspace{0.3em}
-  \begin{center}
-    \emphc{A benchmark outside the design envelope of a tool measures the envelope.}
-  \end{center}
-\end{frame}
-\note{Backup. The negative result, and the answer to ``why is TRT-LLM last in
+note{Backup. The negative result, and the answer to ``why is TRT-LLM last in
 your table'': we benchmarked it on the wrong workload and kept it to make
 that point.}
 
@@ -1727,9 +1681,8 @@ the least likely to be necessary.}
           that it passes \emph{your} eval, not perplexity.
     \item \textbf{Why is my model slow on a big GPU?} You are bandwidth-bound
           at batch 1. Batch it, or shrink the bytes.
-    \item \textbf{vLLM, SGLang or TensorRT-LLM?} vLLM by default. SGLang for
-          structured output and prefix reuse. TensorRT-LLM for the last 20\%
-          on fixed NVIDIA hardware.
+    \item \textbf{vLLM or SGLang?} vLLM by default. SGLang for structured
+          output and prefix reuse.
     \item \textbf{How much VRAM for a 70B?} int4 $\approx$ 35\,GB of weights,
           plus cache. In practice two 40\,GB cards or one 80\,GB card, and
           you will still want a quantized KV cache.
