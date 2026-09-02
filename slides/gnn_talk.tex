@@ -167,35 +167,12 @@ row closest to the projects in this room.
 
 Tell them that the slide is in the repo, so they do not photograph it.}
 
-% --- 5 ----------------------------------------------------------------
-\begin{frame}{In multi-robot systems, a ``message'' is a real radio message}
-  \vspace{0.8em}
-  \begin{center}\large
-    Nodes are robots. Edges are \alert{who is in communication range}.\\[0.6em]
-    One round of message passing $=$ one round of radio traffic.
-  \end{center}
-  \vspace{1.0em}
-  \begin{itemize}
-    \setlength{\itemsep}{0.8em}
-    \item Each layer costs one round of radio traffic per control step, so the
-      \alert{radio bandwidth bounds the layer count}. \arx{1912.06095}
-    \item In physics and manipulation, particles interact \alert{locally and
-      identically}, which is what a shared message function assumes.
-    \item So learned simulators generalize to \alert{more particles than the
-      training set had}.
-  \end{itemize}
-\end{frame}
-\note{The inductive bias matches the physical system here. Say both bullets
-slowly. Both generalize beyond robotics.
-
-Use the promise from the GNS slide.}
-
 
 % =========================================================================
 % Movement 2: The message-passing layer
 % =========================================================================
 
-% --- 6 ----------------------------------------------------------------
+% --- 5 ----------------------------------------------------------------
 \begin{frame}{One idea: each node makes a summary of its neighbors, then repeats}
   \vspace{-0.4em}
   \begin{center}
@@ -237,7 +214,7 @@ Use the promise from the GNS slide.}
 \note{Say the sentence before any notation appears. Do not rush this slide, and
 do not add symbols yet. If they remember one slide, make it this one.}
 
-% --- 7 ----------------------------------------------------------------
+% --- 6 ----------------------------------------------------------------
 \begin{frame}{The message-passing equation, in three clicks}
   \vspace{1.6em}
   \begin{center}
@@ -278,7 +255,7 @@ relative pose. That design decision is worth more than the architecture.
 
 CHECKPOINT: 17:32 by the end of this slide.}
 
-% --- 8 ----------------------------------------------------------------
+% --- 7 ----------------------------------------------------------------
 \begin{frame}{$L$ layers $=$ an $L$-hop receptive field}
   \vspace{0.2em}
   \begin{center}
@@ -331,7 +308,7 @@ grows one hop per layer.
 Most of the room already has the CNN receptive-field picture. Give them
 the mapping and stop.}
 
-% --- 9 ----------------------------------------------------------------
+% --- 8 ----------------------------------------------------------------
 \begin{frame}{GCN, GraphSAGE, GAT differ only in the AGG box}
   \vspace{0.6em}
   \begin{center}
@@ -365,7 +342,7 @@ Do not discuss expressiveness or the WL test. If someone asks, give one sentence
 % Failure modes and code
 % =========================================================================
 
-% --- 10 ---------------------------------------------------------------
+% --- 9 ----------------------------------------------------------------
 \begin{frame}{Deeper is worse: over-smoothing after 3 layers}
   \vspace{0.2em}
   \begin{columns}[c]
@@ -489,7 +466,7 @@ is the line the last twenty minutes were about.
 
 If someone asks about libraries: PyTorch Geometric. If you need heterogeneous graphs, use DGL.}
 
-% --- 11 ---------------------------------------------------------------
+% --- 10 ---------------------------------------------------------------
 \begin{frame}{PyTorch Geometric tutorials on Colab}
   \vspace{0.2em}
   \begin{center}\small
@@ -548,7 +525,7 @@ CHECKPOINT: back on slides by 17:44.}
 % Movement 3: GNNs and Transformers
 % =========================================================================
 
-% --- 12 ---------------------------------------------------------------
+% --- 11 ---------------------------------------------------------------
 \begin{frame}{What does a CNN assume? What does a Transformer assume?}
   \vspace{1.4em}
   \begin{columns}[T]
@@ -573,7 +550,7 @@ for the next 25 minutes.
 
 If nobody answers within five seconds, answer it yourself and move on.}
 
-% --- 13 ---------------------------------------------------------------
+% --- 12 ---------------------------------------------------------------
 \begin{frame}{Flattening fails: relabel the nodes and the answer changes}
   \vspace{0.4em}
   An MLP takes six objects on a table as one flattened vector.
@@ -600,7 +577,7 @@ If nobody answers within five seconds, answer it yourself and move on.}
 \note{The PyG Introduction tutorial shows this: renumber the nodes in a small
 graph and the MLP output changes, while the GCN output stays the same.}
 
-% --- 14 ---------------------------------------------------------------
+% --- 13 ---------------------------------------------------------------
 \begin{frame}{Flattening fails: the number of objects changes}
   \vspace{1.2em}
   \begin{center}
@@ -621,7 +598,7 @@ graph and the MLP output changes, while the GCN output stays the same.}
 \end{frame}
 \note{40 seconds. The audience already believes this one.}
 
-% --- 15 ---------------------------------------------------------------
+% --- 14 ---------------------------------------------------------------
 \begin{frame}{A Transformer is a GNN on the complete graph}
   \vspace{0.4em}
   \begin{center}
@@ -716,7 +693,7 @@ arXiv:2106.03672 (Amorpheus), arXiv:2408.16932 (PT v3).}
 % Close
 % =========================================================================
 
-% --- 16 ---------------------------------------------------------------
+% --- 15 ---------------------------------------------------------------
 \begin{frame}{When \emph{not} to use a GNN}
   \vspace{0.8em}
   \begin{itemize}
@@ -747,7 +724,7 @@ MeshGraphNets), and multi-robot coordination (Li \& Prorok) all held with
 GNNs. The field has converged on hybrids (GraphGPS), but T\"onshoff et al.\
 (LoG 2023) showed that tuned MPNNs close most of the reported gap.}
 
-% --- 17 ---------------------------------------------------------------
+% --- 16 ---------------------------------------------------------------
 \begin{frame}{When is a problem a graph?}
   \vspace{1.2em}
   \begin{enumerate}
@@ -766,7 +743,7 @@ problem is a graph.
 
 Give them five seconds of silence to test their own project against it.}
 
-% --- 18 ---------------------------------------------------------------
+% --- 17 ---------------------------------------------------------------
 \begin{frame}{Take-home}
   \vspace{0.2em}
   \begin{center}
@@ -798,7 +775,7 @@ Give them five seconds of silence to test their own project against it.}
 
 CHECKPOINT: 17:48. You promised 17:50. Finish early.}
 
-% --- 19 ---------------------------------------------------------------
+% --- 18 ---------------------------------------------------------------
 \begin{frame}[plain]
   \vspace{2.2em}
   \begin{center}
