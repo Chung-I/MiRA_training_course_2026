@@ -198,7 +198,7 @@ answers. There is no time.}
     \end{column}
   \end{columns}
 \end{frame}
-\note{Demo 5 in the notebook measured these numbers (225 points).
+\note{The k-NN numbers are from 225 random 2D points.
 
 Ask the room: which k is correct? There is no answer without the task. If k
 is too small, the object breaks into pieces. If k is too large, everything
@@ -278,56 +278,214 @@ slowly. Both generalize beyond robotics.
 
 Use the promise from the GNS slide.}
 
+
+% =========================================================================
+% Movement 2: The message-passing layer
+% =========================================================================
+
 % --- 7 ----------------------------------------------------------------
-\begin{frame}{Deeper is worse: over-smoothing after 3 layers}
+\begin{frame}{One idea: each node makes a summary of its neighbors, then repeats}
+  \vspace{-0.4em}
+  \begin{center}
+    \begin{tikzpicture}[scale=0.92, every node/.style={transform shape},
+      nb/.style={circle, draw=acc2, fill=acc2!15, minimum size=8mm,
+                 font=\small, inner sep=0pt},
+      me/.style={circle, draw=acc, very thick, fill=acc!12, minimum size=10mm,
+                 font=\small, inner sep=0pt},
+      msg/.style={-{Latex[length=2mm]}, acc2, thick}]
+
+      \node[me] (v) at (0,0) {$\hv$};
+      \node[nb] (u1) at (150:2.3) {$h_{u_1}$};
+      \node[nb] (u2) at ( 90:2.3) {$h_{u_2}$};
+      \node[nb] (u3) at ( 30:2.3) {$h_{u_3}$};
+      \node[nb] (u4) at (270:2.3) {$h_{u_4}$};
+
+      \foreach \u in {u1,u2,u3,u4} \draw[msg] (\u) -- (v);
+      \node[color=acc2, font=\scriptsize, anchor=north east] at (-0.95,0.32)
+        {message};
+
+      \node<2->[draw=acc, fill=white, rounded corners=2pt, font=\scriptsize,
+            right=3.0cm of v, align=center] (agg)
+        {sum / mean / max\\ \color{dim}(order-independent)};
+      \draw<2->[-{Latex[length=2mm]}, acc, thick] (v) -- (agg);
+
+      \node<3->[draw=good, fill=good!8, rounded corners=2pt, font=\scriptsize,
+            below=0.9cm of agg, align=center] (upd)
+        {small MLP\\ \color{dim}update the node};
+      \draw<3->[-{Latex[length=2mm]}, good, thick] (agg) -- (upd);
+    \end{tikzpicture}
+  \end{center}
+  \vspace{-0.3em}
+  \begin{enumerate}
+    \item<1-> Each neighbor \alert{sends a message}.
+    \item<2-> The node combines them with an \alert{order-independent} function: sum, mean or max.
+    \item<3-> The node \alert{updates its own vector} with a small MLP. The layer repeats $L$ times.
+  \end{enumerate}
+\end{frame}
+\note{Say the sentence before any notation appears. Do not rush this slide, and
+do not add symbols yet. If they remember one slide, make it this one.}
+
+% --- 8 ----------------------------------------------------------------
+\begin{frame}{The message-passing equation, in three clicks}
+  \vspace{1.6em}
+  \begin{center}
+    \large
+    \only<1>{$\hv \;\leftarrow\; \textcolor{dim}{\mathrm{UPDATE}\Big(\hv,\;
+      \mathrm{AGG}\big\{}\;\textcolor{acc}{\mathrm{MSG}(\hv, \hu, e_{uv})}\;
+      \textcolor{dim}{:\; u \in \Nv \big\}\Big)}$}
+    \only<2>{$\hv \;\leftarrow\; \textcolor{dim}{\mathrm{UPDATE}\Big(\hv,\;}
+      \textcolor{acc}{\mathrm{AGG}\big\{}\;\mathrm{MSG}(\hv, \hu, e_{uv})\;
+      \textcolor{acc}{:\; u \in \Nv \big\}}\textcolor{dim}{\Big)}$}
+    \only<3->{$\hv \;\leftarrow\; \textcolor{acc}{\mathrm{UPDATE}\Big(}\hv
+      \textcolor{acc}{,}\;
+      \mathrm{AGG}\big\{\;\mathrm{MSG}(\hv, \hu, e_{uv})\;:\; u \in \Nv \big\}
+      \textcolor{acc}{\Big)}$}
+  \end{center}
+  \vspace{1.8em}
+  \begin{center}
+    \only<1>{\alert{A neighbor $u$ sends a message to $v$.} The message can use
+      the features of $v$, the features of $u$, and \emph{the edge feature $e_{uv}$}.}
+    \only<2>{\alert{AGG combines all the messages} with a sum, mean or max.
+      Because that function ignores order, the layer is permutation invariant.}
+    \only<3>{\alert{UPDATE is a small MLP} on $(h_v,\ \text{summary})$.
+      That completes one layer.}
+    \only<4>{\alert{A GNN is $L$ of these layers}, stacked.}
+  \end{center}
+  \vspace{1.2em}
+  \onslide<4->{\begin{center}\small\color{dim}
+    GCN in one line: $H \leftarrow \hat{A}\,(H W)$, with
+    $\hat{A} = D^{-1/2}(A+I)D^{-1/2}$, a normalized neighbor average, then a
+    linear map.
+  \end{center}}
+\end{frame}
+\note{This is the only equation in the talk. Read it left to right, out loud,
+one click at a time. Point at the colored piece each time.
+
+Emphasize: $e_{uv}$ is the edge feature. In robotics that is the
+relative pose. That design decision is worth more than the architecture.
+
+CHECKPOINT: 17:32 by the end of this slide.}
+
+% --- 9 ----------------------------------------------------------------
+\begin{frame}{$L$ layers $=$ an $L$-hop receptive field}
   \vspace{0.2em}
-  \begin{columns}[c]
+  \begin{center}
+    \begin{tikzpicture}[scale=1.0, every node/.style={transform shape},
+      n/.style={circle, draw=dim, fill=black!3, minimum size=6.5mm, inner sep=0pt},
+      h1/.style={circle, draw=acc2, very thick, fill=acc2!30, minimum size=6.5mm,
+                 inner sep=0pt},
+      h2/.style={circle, draw=good, very thick, fill=good!25, minimum size=6.5mm,
+                 inner sep=0pt},
+      me/.style={circle, draw=acc, very thick, fill=acc!25, minimum size=7.5mm,
+                 inner sep=0pt}]
+
+      \coordinate (cv) at (0,0);
+      \coordinate (ca) at (-1.6, 1.0);  \coordinate (cb) at (1.6, 1.0);
+      \coordinate (cc) at (0,-1.6);
+      \coordinate (cd) at (-3.1, 1.8);  \coordinate (ce) at (-2.7,-0.3);
+      \coordinate (cf) at ( 3.1, 1.8);  \coordinate (cg) at ( 2.7,-0.3);
+      \coordinate (ch) at (-1.4,-2.7);  \coordinate (ci) at ( 1.4,-2.7);
+
+      \foreach \x/\y in {cv/ca, cv/cb, cv/cc, ca/cd, ca/ce, cb/cf, cb/cg,
+                         cc/ch, cc/ci, ce/ch}
+        \draw[dim] (\x) -- (\y);
+
+      % base state: every node grey
+      \foreach \c in {ca,cb,cc,cd,ce,cf,cg,ch,ci} \node[n] at (\c) {};
+      % 1-hop lights up on click 2
+      \node<2->[h1] at (ca) {}; \node<2->[h1] at (cb) {}; \node<2->[h1] at (cc) {};
+      % 2-hop lights up on click 3
+      \node<3->[h2] at (cd) {}; \node<3->[h2] at (ce) {}; \node<3->[h2] at (cf) {};
+      \node<3->[h2] at (cg) {}; \node<3->[h2] at (ch) {}; \node<3->[h2] at (ci) {};
+      \node[me] at (cv) {\tiny $v$};
+
+      \node[font=\small, anchor=west, color=acc]  at (3.9,1.70)
+        {layer 0: $v$ only};
+      \node<2->[font=\small, anchor=west, color=acc2] at (3.9,1.00)
+        {after 1 layer: 1 hop};
+      \node<3->[font=\small, anchor=west, color=good] at (3.9,0.30)
+        {after 2 layers: 2 hops};
+    \end{tikzpicture}
+  \end{center}
+  \vspace{-0.6em}
+  \onslide<4->{\begin{center}\large
+    After $L$ layers, $h_v$ depends on every node within $L$ hops,\\
+    the same way a CNN receptive field grows by one pixel per layer.
+  \end{center}}
+\end{frame}
+\note{To show this live: put a 1 on node 0 and propagate. The non-zero set
+grows one hop per layer.
+
+Most of the room already has the CNN receptive-field picture. Give them
+the mapping and stop.}
+
+% --- 10 ---------------------------------------------------------------
+\begin{frame}{GCN, GraphSAGE, GAT differ only in the AGG box}
+  \vspace{0.6em}
+  \begin{center}
+  \small
+  \begin{tabular}{@{}lll@{}}
+    \toprule
+    & \textbf{AGG} & \textbf{Use it when} \\
+    \midrule
+    \textbf{GCN}       & normalized mean & first. It is the baseline \\[0.5em]
+    \textbf{GraphSAGE} & sample neighbors, then mean/max
+                       & the graph is large, or new nodes\\
+                       & & appear at test time \\[0.5em]
+    \textbf{GAT}       & attention-weighted sum
+                       & some neighbors matter more than others \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+  \vfill
+  \begin{center}\large
+    GCN, GraphSAGE and GAT share MSG and UPDATE, and differ only in \alert{AGG}.
+  \end{center}
+\end{frame}
+\note{Say it aloud: they differ in that one box. Most GNN variants are this
+single choice. This slide removes the fear of the literature.
+
+Do not discuss expressiveness or the WL test. If someone asks, give one sentence.}
+
+
+
+% =========================================================================
+% Failure modes and code
+% =========================================================================
+
+% --- 11 ---------------------------------------------------------------
+\begin{frame}{Deeper is worse: over-smoothing after 3 layers}
+  \vspace{0.4em}
+  \begin{columns}[T]
     \begin{column}{0.50\textwidth}
-      \centering\small
-      \begin{tabular}{@{}rrr@{}}
-        \toprule
-        layers & test acc. & mean pairwise dist. \\
-        \midrule
-        1 & 71.2\% & \\
-        2 & 91.3\% & \\
-        3 & \textcolor{good}{\textbf{96.9\%}} & \\
-        4 & 96.2\% & \\
-        5 & 96.2\% & 5.6 \\
-        6 & \textcolor{acc}{\textbf{54.4\%}} & \textcolor{acc}{\textbf{0.10}} \\
-        7 & 56.2\% & \\
-        8 & 48.8\% & \\
-        \bottomrule
-      \end{tabular}
+      After enough rounds of averaging with neighbors, \alert{each node in a
+      connected graph holds the same vector}. Li et al.\ (AAAI 2018) identified
+      this as over-smoothing.
+      \vspace{0.6em}
+
+      The PyG node-classification tutorial on Cora shows the pattern: accuracy
+      peaks at 2--3 GCN layers and collapses by 6--8. The pairwise distance
+      between node embeddings drops toward zero at the same rate.
     \end{column}
     \begin{column}{0.46\textwidth}
-      \footnotesize
-      After enough rounds of averaging with your neighbors, \alert{each node
-      in a connected graph holds the same vector}. Over-smoothing comes from the
-      averaging itself, for any task.
-      \vspace{0.5em}
-
       \textbf{Two caveats:}
       \begin{itemize}\setlength{\itemsep}{0.3em}
         \item The cliff mixes over-smoothing with the difficulty of
           \alert{deep GCN training} without residual connections.
-        \item This is a toy task with a \emph{global} label, so extra hops help
-          for longer than usual. On real benchmarks the optimum is
-          \alert{2--3 layers}.
+        \item On real benchmarks the optimum is \alert{2--3 layers}. Deeper
+          GCNs rarely help unless the graph has been rewired (see over-squashing).
       \end{itemize}
+      \vspace{0.6em}
+      Under either explanation, \alert{two layers} is the right starting point.
     \end{column}
   \end{columns}
-  \vspace{0.4em}
-  \begin{center}\large
-    Under either explanation, \alert{two layers} is the right starting point.
-  \end{center}
 \end{frame}
-\note{Demo 6 in the notebook measured these.
+\note{The PyG node-classification tutorial (Cora, GCN) is the best live demo for
+this: add layers and watch accuracy drop. If you run it during the talk, stop
+at 8 layers.
 
-Read the distance column first: 5.6 at 5 layers, 0.10 at 6. The embeddings
-collapse, and the accuracy follows.
-
-Do not present this as pure over-smoothing. Give both explanations. Then
-give them the rule, which holds either way.
+Li et al., ``Deeper Insights into Graph Convolutional Networks for
+Semi-Supervised Learning,'' AAAI 2018.
 
 If you need long-range information, add a global node or a hierarchy. Do not add depth.}
 
@@ -399,7 +557,7 @@ is the line the last twenty minutes were about.
 
 If someone asks about libraries: PyTorch Geometric. If you need heterogeneous graphs, use DGL.}
 
-% --- 8 ----------------------------------------------------------------
+% --- 12 ---------------------------------------------------------------
 \begin{frame}{PyTorch Geometric tutorials on Colab}
   \vspace{0.4em}
   \begin{center}\small
@@ -433,313 +591,12 @@ Budget 2 minutes. If a cell fails, close it and say the link is on this slide.
 
 CHECKPOINT: back on slides by 17:44.}
 
-% --- 9 ----------------------------------------------------------------
-\begin{frame}{When \emph{not} to use a GNN}
-  \vspace{0.8em}
-  \begin{itemize}
-    \setlength{\itemsep}{0.8em}
-    \item If the graph is \textbf{small and dense}, a Transformer computes the
-      same thing on a complete graph, and the tooling is better.
-    \item If you \textbf{invented the edges} to make it a graph, you invented a
-      prior, and it can be wrong. Kurin et al.\ (ICLR 2021) showed
-      that encoding the kinematic tree \alert{hurt} morphology control.
-    \item If the data is a \textbf{grid or a sequence}, a CNN or a Transformer
-      already encodes that structure.
-    \item If you have \textbf{abundant data or pretraining}, a Transformer can
-      learn the edges from scratch. RT-1/2, Octo, OpenVLA and $\pi_0$
-      are Transformer-native VLA policies.
-  \end{itemize}
-  \vfill
-  \begin{center}\large
-    A GNN outperforms a Transformer when the \alert{interaction graph is
-    sparse, physically real, and the data is limited}.
-  \end{center}
-\end{frame}
-\note{The Amorpheus result (Kurin et al.\ 2021) is the counterexample that
-teaches judgment: the physical graph existed and hurt. Point Transformer v3
-displaced DGCNN on point clouds. The whole VLA stack is Transformer-native.
-
-But RoboBallet (Science Robotics 2025), the learned-simulator line (GNS,
-MeshGraphNets), and multi-robot coordination (Li \& Prorok) all held with
-GNNs. The field has converged on hybrids (GraphGPS), but T\"onshoff et al.\
-(LoG 2023) showed that tuned MPNNs close most of the reported gap.}
-
-% --- 10 ---------------------------------------------------------------
-\begin{frame}{When is a problem a graph?}
-  \vspace{1.2em}
-  \begin{enumerate}
-    \setlength{\itemsep}{1.3em}
-    \item \Large Do I have \alert{entities with relations} between them?
-    \item \Large Is there \alert{no natural ordering} of those entities?
-    \item \Large Does the \alert{number of them change}?
-  \end{enumerate}
-  \vspace{1.4em}
-  \begin{center}\large
-    \textbf{Two yeses} $\Rightarrow$ a GNN is worth testing.
-  \end{center}
-\end{frame}
-\note{Slow down. The whole talk exists so they can recognize when their own
-problem is a graph.
-
-Give them five seconds of silence to test their own project against it.}
-
-% --- 11 ---------------------------------------------------------------
-\begin{frame}{Take-home}
-  \vspace{0.2em}
-  \begin{center}
-    \large
-    A GNN repeats one operation: \alert{each node aggregates its neighbors,
-    then updates its own vector.}\\[0.8em]
-    \alert{Graph construction} decides performance. The layer architecture
-    matters less.
-  \end{center}
-  \vspace{1.1em}
-  \hrule
-  \vspace{0.7em}
-  \footnotesize
-  \textbf{Five papers to read, in order}
-  \begin{itemize}\setlength{\itemsep}{0.15em}
-    \item Joshi, ``Transformers are Graph Neural Networks'' (2020/2025): the
-      equivalence stated as a mapping.
-    \item Sanchez-Gonzalez et al., GNS (ICML 2020): the canonical ``encode
-      the physical graph'' success. \arx{2002.09405}
-    \item Kurin et al., Amorpheus (ICLR 2021): the counterexample where
-      the physical graph hurt. \arx{2106.03672}
-    \item Ramp\'{a}\v{s}ek et al., GraphGPS (NeurIPS 2022): the hybrid
-      recipe. \arx{2205.12454}
-    \item T\"{o}nshoff et al., ``Where Did the Gap Go?'' (LoG 2023):
-      tuned MPNNs close most of the Transformer gap. \arx{2309.00367}
-  \end{itemize}
-\end{frame}
-\note{Say the one-thing sentence one last time, word for word as on slide 2. Then give the resources, fast.
-
-CHECKPOINT: 17:48. You promised 17:50. Finish early.}
-
-% --- 12 ---------------------------------------------------------------
-\begin{frame}[plain]
-  \vspace{2.2em}
-  \begin{center}
-    {\Huge Questions?}\\[2.0em]
-    {\large\color{dim}
-      \CJK{仲翊} \quad$\cdot$\quad MiRA Training Course 2026}\\[0.8em]
-    {\small\color{dim}
-      Slides and notebooks:
-      \texttt{github.com/Chung-I/MiRA\_training\_course\_2026}}
-  \end{center}
-\end{frame}
-\note{Q\&A prep:
-
-* "Isn't a Transformer just a GNN?" -> Yes: self-attention is message passing
-  on the complete graph, where the message is a value vector scaled by softmax
-  attention. GAT is the same computation restricted to real edges. The
-  equivalence breaks at positional encodings (without them, a Transformer treats
-  its input as a set), the per-token FFN (no graph analogue), and LayerNorm.
-  (Joshi 2020/2025, Dwivedi \& Bresson 2021.)
-
-* "How many layers?" -> Start at 2. Over-smoothing collapses representations
-  at 4--6 layers. Over-squashing (Alon \& Yahav 2021) is a separate problem:
-  information from an exponentially growing receptive field compresses into a
-  fixed-size vector. Di Giovanni et al.\ (ICML 2023) proved that depth does
-  not fix it --- widen the network, or add a global node, or rewire.
-
-* "How do I build the graph for a point cloud?" -> k-NN with k around 16--20
-  in xyz, edge feature = relative position. DGCNN recomputes edges in feature
-  space each layer. Point Transformer v3 (CVPR 2024) now leads on S3DIS and
-  SemanticKITTI by replacing the k-NN graph with full attention over points.
-
-* "Are GNNs still relevant?" -> RoboBallet (Science Robotics 2025) and the
-  learned-simulator line (GNS, MeshGraphNets) are active. A known sparse
-  graph wins on sample efficiency and size generalization. But Amorpheus
-  (ICLR 2021) showed the kinematic tree hurts morphology control, and VLA
-  policies (RT-1/2, Octo, OpenVLA, pi0) are Transformer-native. The field
-  has converged on hybrids (GraphGPS: local MPNN + global attention + PE).
-  T\"onshoff et al.\ (LoG 2023) showed that tuned MPNNs close most of the
-  reported graph-transformer gap on long-range benchmarks.
-
-* "Which library?" -> PyTorch Geometric (PyG). DGL if you need heterogeneous
-  graphs. The four official PyG Colab tutorials are on the previous slide.
-
-* "What about expressiveness / WL?" -> One sentence: MPNNs are bounded by
-  1-WL (Xu et al.\ 2019). Graph transformers with the right positional
-  encodings exceed 1-WL and reach between 1-WL and 3-WL (TokenGT, Graphormer,
-  GRIT). But higher WL expressiveness does not reliably predict benchmark
-  accuracy. Give the sentence and move on.}
-
-
-% =========================================================================
-% Movement 2: The message-passing layer
-% =========================================================================
-
-% --- 13 ---------------------------------------------------------------
-\begin{frame}{One idea: each node makes a summary of its neighbors, then repeats}
-  \vspace{-0.4em}
-  \begin{center}
-    \begin{tikzpicture}[scale=0.92, every node/.style={transform shape},
-      nb/.style={circle, draw=acc2, fill=acc2!15, minimum size=8mm,
-                 font=\small, inner sep=0pt},
-      me/.style={circle, draw=acc, very thick, fill=acc!12, minimum size=10mm,
-                 font=\small, inner sep=0pt},
-      msg/.style={-{Latex[length=2mm]}, acc2, thick}]
-
-      \node[me] (v) at (0,0) {$\hv$};
-      \node[nb] (u1) at (150:2.3) {$h_{u_1}$};
-      \node[nb] (u2) at ( 90:2.3) {$h_{u_2}$};
-      \node[nb] (u3) at ( 30:2.3) {$h_{u_3}$};
-      \node[nb] (u4) at (270:2.3) {$h_{u_4}$};
-
-      \foreach \u in {u1,u2,u3,u4} \draw[msg] (\u) -- (v);
-      \node[color=acc2, font=\scriptsize, anchor=north east] at (-0.95,0.32)
-        {message};
-
-      \node<2->[draw=acc, fill=white, rounded corners=2pt, font=\scriptsize,
-            right=3.0cm of v, align=center] (agg)
-        {sum / mean / max\\ \color{dim}(order-independent)};
-      \draw<2->[-{Latex[length=2mm]}, acc, thick] (v) -- (agg);
-
-      \node<3->[draw=good, fill=good!8, rounded corners=2pt, font=\scriptsize,
-            below=0.9cm of agg, align=center] (upd)
-        {small MLP\\ \color{dim}update the node};
-      \draw<3->[-{Latex[length=2mm]}, good, thick] (agg) -- (upd);
-    \end{tikzpicture}
-  \end{center}
-  \vspace{-0.3em}
-  \begin{enumerate}
-    \item<1-> Each neighbor \alert{sends a message}.
-    \item<2-> The node combines them with an \alert{order-independent} function: sum, mean or max.
-    \item<3-> The node \alert{updates its own vector} with a small MLP. The layer repeats $L$ times.
-  \end{enumerate}
-\end{frame}
-\note{Say the sentence before any notation appears. Do not rush this slide, and
-do not add symbols yet. If they remember one slide, make it this one.}
-
-% --- 14 ---------------------------------------------------------------
-\begin{frame}{The message-passing equation, in three clicks}
-  \vspace{1.6em}
-  \begin{center}
-    \large
-    \only<1>{$\hv \;\leftarrow\; \textcolor{dim}{\mathrm{UPDATE}\Big(\hv,\;
-      \mathrm{AGG}\big\{}\;\textcolor{acc}{\mathrm{MSG}(\hv, \hu, e_{uv})}\;
-      \textcolor{dim}{:\; u \in \Nv \big\}\Big)}$}
-    \only<2>{$\hv \;\leftarrow\; \textcolor{dim}{\mathrm{UPDATE}\Big(\hv,\;}
-      \textcolor{acc}{\mathrm{AGG}\big\{}\;\mathrm{MSG}(\hv, \hu, e_{uv})\;
-      \textcolor{acc}{:\; u \in \Nv \big\}}\textcolor{dim}{\Big)}$}
-    \only<3->{$\hv \;\leftarrow\; \textcolor{acc}{\mathrm{UPDATE}\Big(}\hv
-      \textcolor{acc}{,}\;
-      \mathrm{AGG}\big\{\;\mathrm{MSG}(\hv, \hu, e_{uv})\;:\; u \in \Nv \big\}
-      \textcolor{acc}{\Big)}$}
-  \end{center}
-  \vspace{1.8em}
-  \begin{center}
-    \only<1>{\alert{A neighbor $u$ sends a message to $v$.} The message can use
-      the features of $v$, the features of $u$, and \emph{the edge feature $e_{uv}$}.}
-    \only<2>{\alert{AGG combines all the messages} with a sum, mean or max.
-      Because that function ignores order, the layer is permutation invariant.}
-    \only<3>{\alert{UPDATE is a small MLP} on $(h_v,\ \text{summary})$.
-      That completes one layer.}
-    \only<4>{\alert{A GNN is $L$ of these layers}, stacked.}
-  \end{center}
-  \vspace{1.2em}
-  \onslide<4->{\begin{center}\small\color{dim}
-    GCN in one line: $H \leftarrow \hat{A}\,(H W)$, with
-    $\hat{A} = D^{-1/2}(A+I)D^{-1/2}$, a normalized neighbor average, then a
-    linear map.
-  \end{center}}
-\end{frame}
-\note{This is the only equation in the talk. Read it left to right, out loud,
-one click at a time. Point at the colored piece each time.
-
-Emphasize: $e_{uv}$ is the edge feature. In robotics that is the
-relative pose. That design decision is worth more than the architecture.
-
-CHECKPOINT: 17:32 by the end of this slide.}
-
-% --- 15 ---------------------------------------------------------------
-\begin{frame}{$L$ layers $=$ an $L$-hop receptive field}
-  \vspace{0.2em}
-  \begin{center}
-    \begin{tikzpicture}[scale=1.0, every node/.style={transform shape},
-      n/.style={circle, draw=dim, fill=black!3, minimum size=6.5mm, inner sep=0pt},
-      h1/.style={circle, draw=acc2, very thick, fill=acc2!30, minimum size=6.5mm,
-                 inner sep=0pt},
-      h2/.style={circle, draw=good, very thick, fill=good!25, minimum size=6.5mm,
-                 inner sep=0pt},
-      me/.style={circle, draw=acc, very thick, fill=acc!25, minimum size=7.5mm,
-                 inner sep=0pt}]
-
-      \coordinate (cv) at (0,0);
-      \coordinate (ca) at (-1.6, 1.0);  \coordinate (cb) at (1.6, 1.0);
-      \coordinate (cc) at (0,-1.6);
-      \coordinate (cd) at (-3.1, 1.8);  \coordinate (ce) at (-2.7,-0.3);
-      \coordinate (cf) at ( 3.1, 1.8);  \coordinate (cg) at ( 2.7,-0.3);
-      \coordinate (ch) at (-1.4,-2.7);  \coordinate (ci) at ( 1.4,-2.7);
-
-      \foreach \x/\y in {cv/ca, cv/cb, cv/cc, ca/cd, ca/ce, cb/cf, cb/cg,
-                         cc/ch, cc/ci, ce/ch}
-        \draw[dim] (\x) -- (\y);
-
-      % base state: every node grey
-      \foreach \c in {ca,cb,cc,cd,ce,cf,cg,ch,ci} \node[n] at (\c) {};
-      % 1-hop lights up on click 2
-      \node<2->[h1] at (ca) {}; \node<2->[h1] at (cb) {}; \node<2->[h1] at (cc) {};
-      % 2-hop lights up on click 3
-      \node<3->[h2] at (cd) {}; \node<3->[h2] at (ce) {}; \node<3->[h2] at (cf) {};
-      \node<3->[h2] at (cg) {}; \node<3->[h2] at (ch) {}; \node<3->[h2] at (ci) {};
-      \node[me] at (cv) {\tiny $v$};
-
-      \node[font=\small, anchor=west, color=acc]  at (3.9,1.70)
-        {layer 0: $v$ only};
-      \node<2->[font=\small, anchor=west, color=acc2] at (3.9,1.00)
-        {after 1 layer: 1 hop};
-      \node<3->[font=\small, anchor=west, color=good] at (3.9,0.30)
-        {after 2 layers: 2 hops};
-    \end{tikzpicture}
-  \end{center}
-  \vspace{-0.6em}
-  \onslide<4->{\begin{center}\large
-    After $L$ layers, $h_v$ depends on every node within $L$ hops,\\
-    the same way a CNN receptive field grows by one pixel per layer.
-  \end{center}}
-\end{frame}
-\note{Demo 3 in the notebook shows this. Put a 1 on node 0 and propagate. The
-non-zero set grows one hop per layer.
-
-Most of the room already has the CNN receptive-field picture. Give them
-the mapping and stop.}
-
-% --- 16 ---------------------------------------------------------------
-\begin{frame}{GCN, GraphSAGE, GAT differ only in the AGG box}
-  \vspace{0.6em}
-  \begin{center}
-  \small
-  \begin{tabular}{@{}lll@{}}
-    \toprule
-    & \textbf{AGG} & \textbf{Use it when} \\
-    \midrule
-    \textbf{GCN}       & normalized mean & first. It is the baseline \\[0.5em]
-    \textbf{GraphSAGE} & sample neighbors, then mean/max
-                       & the graph is large, or new nodes\\
-                       & & appear at test time \\[0.5em]
-    \textbf{GAT}       & attention-weighted sum
-                       & some neighbors matter more than others \\
-    \bottomrule
-  \end{tabular}
-  \end{center}
-  \vfill
-  \begin{center}\large
-    GCN, GraphSAGE and GAT share MSG and UPDATE, and differ only in \alert{AGG}.
-  \end{center}
-\end{frame}
-\note{Say it aloud: they differ in that one box. Most GNN variants are this
-single choice. This slide removes the fear of the literature.
-
-Do not discuss expressiveness or the WL test. If someone asks, give one sentence.}
-
 
 % =========================================================================
 % Movement 3: GNNs and Transformers
 % =========================================================================
 
-% --- 17 ---------------------------------------------------------------
+% --- 13 ---------------------------------------------------------------
 \begin{frame}{What does a CNN assume? What does a Transformer assume?}
   \vspace{1.4em}
   \begin{columns}[T]
@@ -764,7 +621,7 @@ for the next 25 minutes.
 
 If nobody answers within five seconds, answer it yourself and move on.}
 
-% --- 18 ---------------------------------------------------------------
+% --- 14 ---------------------------------------------------------------
 \begin{frame}{Flattening fails: relabel the nodes and the answer changes}
   \vspace{0.4em}
   An MLP takes six objects on a table as one flattened vector.
@@ -788,11 +645,10 @@ If nobody answers within five seconds, answer it yourself and move on.}
   The MLP has to learn $n!$ copies of the same function. A GNN sums over
   neighbors, and a sum \alert{ignores order}.
 \end{frame}
-\note{Demo 1 in the notebook shows this with numbers. If the room is dead,
-switch to Colab and run Demo 1. When you renumber the nodes, the MLP output
-changes on screen.}
+\note{The PyG Introduction tutorial shows this: renumber the nodes in a small
+graph and the MLP output changes, while the GCN output stays the same.}
 
-% --- 19 ---------------------------------------------------------------
+% --- 15 ---------------------------------------------------------------
 \begin{frame}{Flattening fails: the number of objects changes}
   \vspace{1.2em}
   \begin{center}
@@ -813,7 +669,7 @@ changes on screen.}
 \end{frame}
 \note{40 seconds. The audience already believes this one.}
 
-% --- 20 ---------------------------------------------------------------
+% --- 16 ---------------------------------------------------------------
 \begin{frame}{A Transformer is a GNN on the complete graph}
   \vspace{0.4em}
   \begin{center}
@@ -903,5 +759,141 @@ decision rule.
 
 arXiv:2106.03672 (Amorpheus), arXiv:2408.16932 (PT v3).}
 
+
+% =========================================================================
+% Close
+% =========================================================================
+
+% --- 17 ---------------------------------------------------------------
+\begin{frame}{When \emph{not} to use a GNN}
+  \vspace{0.8em}
+  \begin{itemize}
+    \setlength{\itemsep}{0.8em}
+    \item If the graph is \textbf{small and dense}, a Transformer computes the
+      same thing on a complete graph, and the tooling is better.
+    \item If you \textbf{invented the edges} to make it a graph, you invented a
+      prior, and it can be wrong. Kurin et al.\ (ICLR 2021) showed
+      that encoding the kinematic tree \alert{hurt} morphology control.
+    \item If the data is a \textbf{grid or a sequence}, a CNN or a Transformer
+      already encodes that structure.
+    \item If you have \textbf{abundant data or pretraining}, a Transformer can
+      learn the edges from scratch. RT-1/2, Octo, OpenVLA and $\pi_0$
+      are Transformer-native VLA policies.
+  \end{itemize}
+  \vfill
+  \begin{center}\large
+    A GNN outperforms a Transformer when the \alert{interaction graph is
+    sparse, physically real, and the data is limited}.
+  \end{center}
+\end{frame}
+\note{The Amorpheus result (Kurin et al.\ 2021) is the counterexample that
+teaches judgment: the physical graph existed and hurt. Point Transformer v3
+displaced DGCNN on point clouds. The whole VLA stack is Transformer-native.
+
+But RoboBallet (Science Robotics 2025), the learned-simulator line (GNS,
+MeshGraphNets), and multi-robot coordination (Li \& Prorok) all held with
+GNNs. The field has converged on hybrids (GraphGPS), but T\"onshoff et al.\
+(LoG 2023) showed that tuned MPNNs close most of the reported gap.}
+
+% --- 18 ---------------------------------------------------------------
+\begin{frame}{When is a problem a graph?}
+  \vspace{1.2em}
+  \begin{enumerate}
+    \setlength{\itemsep}{1.3em}
+    \item \Large Do I have \alert{entities with relations} between them?
+    \item \Large Is there \alert{no natural ordering} of those entities?
+    \item \Large Does the \alert{number of them change}?
+  \end{enumerate}
+  \vspace{1.4em}
+  \begin{center}\large
+    \textbf{Two yeses} $\Rightarrow$ a GNN is worth testing.
+  \end{center}
+\end{frame}
+\note{Slow down. The whole talk exists so they can recognize when their own
+problem is a graph.
+
+Give them five seconds of silence to test their own project against it.}
+
+% --- 19 ---------------------------------------------------------------
+\begin{frame}{Take-home}
+  \vspace{0.2em}
+  \begin{center}
+    \large
+    A GNN repeats one operation: \alert{each node aggregates its neighbors,
+    then updates its own vector.}\\[0.8em]
+    \alert{Graph construction} decides performance. The layer architecture
+    matters less.
+  \end{center}
+  \vspace{1.1em}
+  \hrule
+  \vspace{0.7em}
+  \footnotesize
+  \textbf{Five papers to read, in order}
+  \begin{itemize}\setlength{\itemsep}{0.15em}
+    \item Joshi, ``Transformers are Graph Neural Networks'' (2020/2025): the
+      equivalence stated as a mapping.
+    \item Sanchez-Gonzalez et al., GNS (ICML 2020): the canonical ``encode
+      the physical graph'' success. \arx{2002.09405}
+    \item Kurin et al., Amorpheus (ICLR 2021): the counterexample where
+      the physical graph hurt. \arx{2106.03672}
+    \item Ramp\'{a}\v{s}ek et al., GraphGPS (NeurIPS 2022): the hybrid
+      recipe. \arx{2205.12454}
+    \item T\"{o}nshoff et al., ``Where Did the Gap Go?'' (LoG 2023):
+      tuned MPNNs close most of the Transformer gap. \arx{2309.00367}
+  \end{itemize}
+\end{frame}
+\note{Say the one-thing sentence one last time, word for word as on slide 2. Then give the resources, fast.
+
+CHECKPOINT: 17:48. You promised 17:50. Finish early.}
+
+% --- 20 ---------------------------------------------------------------
+\begin{frame}[plain]
+  \vspace{2.2em}
+  \begin{center}
+    {\Huge Questions?}\\[2.0em]
+    {\large\color{dim}
+      \CJK{仲翊} \quad$\cdot$\quad MiRA Training Course 2026}\\[0.8em]
+    {\small\color{dim}
+      Slides and notebooks:
+      \texttt{github.com/Chung-I/MiRA\_training\_course\_2026}}
+  \end{center}
+\end{frame}
+\note{Q\&A prep:
+
+* "Isn't a Transformer just a GNN?" -> Yes: self-attention is message passing
+  on the complete graph, where the message is a value vector scaled by softmax
+  attention. GAT is the same computation restricted to real edges. The
+  equivalence breaks at positional encodings (without them, a Transformer treats
+  its input as a set), the per-token FFN (no graph analogue), and LayerNorm.
+  (Joshi 2020/2025, Dwivedi \& Bresson 2021.)
+
+* "How many layers?" -> Start at 2. Over-smoothing collapses representations
+  at 4--6 layers. Over-squashing (Alon \& Yahav 2021) is a separate problem:
+  information from an exponentially growing receptive field compresses into a
+  fixed-size vector. Di Giovanni et al.\ (ICML 2023) proved that depth does
+  not fix it --- widen the network, or add a global node, or rewire.
+
+* "How do I build the graph for a point cloud?" -> k-NN with k around 16--20
+  in xyz, edge feature = relative position. DGCNN recomputes edges in feature
+  space each layer. Point Transformer v3 (CVPR 2024) now leads on S3DIS and
+  SemanticKITTI by replacing the k-NN graph with full attention over points.
+
+* "Are GNNs still relevant?" -> RoboBallet (Science Robotics 2025) and the
+  learned-simulator line (GNS, MeshGraphNets) are active. A known sparse
+  graph wins on sample efficiency and size generalization. But Amorpheus
+  (ICLR 2021) showed the kinematic tree hurts morphology control, and VLA
+  policies (RT-1/2, Octo, OpenVLA, pi0) are Transformer-native. The field
+  has converged on hybrids (GraphGPS: local MPNN + global attention + PE).
+  T\"onshoff et al.\ (LoG 2023) showed that tuned MPNNs close most of the
+  reported graph-transformer gap on long-range benchmarks.
+
+* "Which library?" -> PyTorch Geometric (PyG). DGL if you need heterogeneous
+  graphs. The four official PyG Colab tutorials are on the previous slide.
+
+* "What about expressiveness / WL?" -> One sentence: MPNNs are bounded by
+  1-WL (Xu et al.\ 2019). Graph transformers with the right positional
+  encodings exceed 1-WL and reach between 1-WL and 3-WL (TokenGT, Graphormer,
+  GRIT). But higher WL expressiveness does not reliably predict benchmark
+  accuracy. Give the sentence and move on.}
 
 \end{document}
