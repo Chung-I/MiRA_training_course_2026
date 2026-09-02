@@ -314,49 +314,43 @@ the mapping and stop.}
 \begin{frame}{PyTorch Geometric tutorials on Colab}
   \vspace{0.2em}
   \begin{center}\small
-    \textbf{Official PyG Colab notebooks}
-    \quad{\scriptsize\url{https://pytorch-geometric.readthedocs.io/en/latest/get\_started/colabs.html}}
+    \textbf{Notebooks with cached results}
+    \quad{\scriptsize\texttt{github.com/Chung-I/MiRA\_training\_course\_2026/tree/main/notebooks}}
   \end{center}
   \vspace{0.3em}
   \centering\small
   \begin{tabular}{@{}llrl@{}}
     \toprule
-    \textbf{Tutorial} & \textbf{Dataset} & \textbf{Result} & \textbf{Graph} \\
+    \textbf{Notebook} & \textbf{Dataset} & \textbf{Result} & \textbf{Graph} \\
     \midrule
-    \href{https://colab.research.google.com/drive/1h3-vJGRVloF5zStxL5I0rSy4ZUPNsjy8}{Introduction}
-      & KarateClub (34 nodes)
-      & 76.5\%
-      & social network \\[0.3em]
-    \href{https://colab.research.google.com/drive/14OvFnAXggxB8vM4e8vSURUp1TaKnovzX}{Node classif.}
+    \href{https://colab.research.google.com/github/Chung-I/MiRA_training_course_2026/blob/main/notebooks/pyg_node_classification.ipynb}{Node classif.}
       & Cora (2,708 nodes)
-      & \textcolor{good}{\textbf{81.1\%}}
+      & \textcolor{good}{\textbf{80.7\%}}
       & citation \\
       & {\color{dim}MLP baseline}
-      & {\color{dim}57.1\%}
+      & {\color{dim}54.7\%}
       & {\color{dim}(no graph)} \\[0.3em]
-    \href{https://colab.research.google.com/drive/1I8a0DfQ3fI7Njc62__mVXUlcAleUclnb}{Graph classif.}
+    \href{https://colab.research.google.com/github/Chung-I/MiRA_training_course_2026/blob/main/notebooks/pyg_graph_classification.ipynb}{Graph classif.}
       & MUTAG (188 graphs)
-      & 78.9\%
-      & molecular bonds \\[0.3em]
-    \href{https://colab.research.google.com/drive/1D45E5bUK3gQ40YpZo65ozs7hg5l-eo_U}{Point clouds}
-      & ModelNet10
-      &
-      & radius ball \\
+      & 70.5\%
+      & molecular bonds \\
     \bottomrule
   \end{tabular}
   \vspace{0.4em}
 
   \begin{center}\small
-    The 24-point gap between MLP and GCN on Cora comes from the citation
-    graph. The node features alone do not separate the classes.
+    The 26-point gap between MLP (54.7\%) and GCN (80.7\%) on Cora comes
+    from the citation graph. The node features alone do not separate the
+    classes. The node-classification notebook also contains a layer sweep
+    that shows over-smoothing (appendix).
   \end{center}
 \end{frame}
-\note{All four run on a free Colab CPU or T4. Each installs PyG inside the
-notebook.
+\note{Both notebooks are in the repo with cached outputs. Open them in Colab
+via the badge at the top of each notebook. Results are visible without
+re-running.
 
-The node-classification result (MLP 57.1\% vs GCN 81.1\%) is the single most
-useful number in the talk for explaining why graph structure matters. The
-over-smoothing layer sweep is in the appendix.
+The node-classification notebook includes a layer sweep (Section 5) showing
+over-smoothing: accuracy peaks at 2 layers (80.7\%) and drops to 61.6\% at 8.
 
 If time allows, open the node-classification notebook and change num\_layers
 live. Budget 2 minutes. If a cell fails, close it and point at this slide.
@@ -369,29 +363,114 @@ CHECKPOINT: back on slides by 17:44.}
 % =========================================================================
 
 % --- 9 ----------------------------------------------------------------
-\begin{frame}{What does a CNN assume? What does a Transformer assume?}
-  \vspace{1.4em}
-  \begin{columns}[T]
-    \begin{column}{0.45\textwidth}
-      \centering
-      \onslide<2->{A \textbf{CNN} assumes a \alert{grid}.\\
-      {\small The neighbors of a pixel are the adjacent pixels.}}
-    \end{column}
-    \begin{column}{0.45\textwidth}
-      \centering
-      \onslide<3->{A \textbf{Transformer} assumes an \alert{ordered sequence}.\\
-      {\small Each token has a position 1, 2, 3, \dots}}
-    \end{column}
-  \end{columns}
-  \vfill
-  \onslide<4->{\begin{center}\large
-    None of the four examples is a grid or a sequence.
-  \end{center}}
-\end{frame}
-\note{Hands up, say it aloud. Ask it, wait, and take answers from the room. These 45 seconds keep them awake
-for the next 25 minutes.
+\begin{frame}{CNN, Transformer, GNN: three assumptions about structure}
+  \vspace{0.2em}
+  \begin{center}
+    \begin{tikzpicture}[
+      font=\scriptsize,
+      nd/.style={circle, draw=acc2, fill=acc2!15, minimum size=4.5mm,
+                 inner sep=0pt},
+      hl/.style={circle, draw=acc, very thick, fill=acc!20, minimum size=5mm,
+                 inner sep=0pt},
+      ed/.style={dim, line width=0.4pt},
+      edc/.style={acc2, line width=0.5pt},
+    ]
 
-If nobody answers within five seconds, answer it yourself and move on.}
+    % === CNN: 4x4 grid, center pixel highlighted with 3x3 kernel ===
+    \node[font=\small\bfseries] at (1.2, 3.6) {CNN};
+    \foreach \r in {0,...,3} {
+      \foreach \c in {0,...,3} {
+        \pgfmathtruncatemacro{\idx}{\r*4+\c}
+        \node[nd] (g\idx) at (\c*0.6, 2.8-\r*0.6) {};
+      }
+    }
+    % grid edges (horizontal)
+    \foreach \r in {0,...,3} {
+      \foreach \c in {0,...,2} {
+        \pgfmathtruncatemacro{\a}{\r*4+\c}
+        \pgfmathtruncatemacro{\b}{\r*4+\c+1}
+        \draw[ed] (g\a)--(g\b);
+      }
+    }
+    % grid edges (vertical)
+    \foreach \r in {0,...,2} {
+      \foreach \c in {0,...,3} {
+        \pgfmathtruncatemacro{\a}{\r*4+\c}
+        \pgfmathtruncatemacro{\b}{(\r+1)*4+\c}
+        \draw[ed] (g\a)--(g\b);
+      }
+    }
+    % highlight center pixel and its 3x3 neighborhood
+    \node[hl] at (1*0.6, 2.8-1*0.6) {};
+    \foreach \dr/\dc in {-1/-1,-1/0,-1/1,0/-1,0/1,1/-1,1/0,1/1} {
+      \pgfmathtruncatemacro{\nr}{1+\dr}
+      \pgfmathtruncatemacro{\nc}{1+\dc}
+      \pgfmathtruncatemacro{\ni}{\nr*4+\nc}
+      \draw[edc, thick] (g5)--(g\ni);
+    }
+    \node[font=\tiny, color=dim, align=center] at (1.2, 0.0)
+      {\alert{fixed grid}\\each pixel has the\\same 8 neighbors};
+
+    % === Transformer: 6 tokens, fully connected ===
+    \node[font=\small\bfseries] at (5.5, 3.6) {Transformer};
+    \foreach \i in {0,...,5}
+      \node[nd] (t\i) at (5.5+\i*0.55-1.375, 2.5) {};
+    % positional encoding arrow
+    \node[font=\tiny, color=dim] at (5.5, 2.95) {$+$ position};
+    % full connections from token 2
+    \node[hl] (t2h) at (5.5+2*0.55-1.375, 2.5) {};
+    \foreach \j in {0,1,3,4,5}
+      \draw[edc, thick, opacity=0.5] (t2h)--(t\j);
+    % all-to-all dim
+    \foreach \i in {0,...,5} {
+      \foreach \j in {\i,...,5} {
+        \ifnum\i<\j
+          \pgfmathtruncatemacro{\skip}{(\i==2)||(\j==2)?1:0}
+          \ifnum\skip=0
+            \draw[ed, opacity=0.3] (t\i)--(t\j);
+          \fi
+        \fi
+      }
+    }
+    \node[font=\tiny, color=dim, align=center] at (5.5, 0.0)
+      {\alert{complete graph}\\attention learns which\\connections matter};
+
+    % === GNN: irregular graph ===
+    \node[font=\small\bfseries] at (10.2, 3.6) {GNN};
+    \node[nd] (n0) at (9.2, 2.7) {};
+    \node[nd] (n1) at (10.0, 2.9) {};
+    \node[nd] (n2) at (10.8, 2.6) {};
+    \node[nd] (n3) at (9.5, 1.9) {};
+    \node[hl] (n4) at (10.3, 1.8) {};
+    \node[nd] (n5) at (11.1, 2.0) {};
+    \node[nd] (n6) at (9.8, 1.1) {};
+    \node[nd] (n7) at (10.6, 1.0) {};
+    \draw[ed] (n0)--(n1); \draw[ed] (n1)--(n2); \draw[ed] (n2)--(n5);
+    \draw[ed] (n0)--(n3); \draw[ed] (n3)--(n6); \draw[ed] (n6)--(n7);
+    \draw[edc, thick] (n4)--(n3); \draw[edc, thick] (n4)--(n5);
+    \draw[edc, thick] (n4)--(n7); \draw[edc, thick] (n4)--(n1);
+    \node[font=\tiny, color=dim, align=center] at (10.2, 0.0)
+      {\alert{sparse, irregular}\\edges encode a known\\physical relation};
+
+    \end{tikzpicture}
+  \end{center}
+  \vspace{0.2em}
+  \begin{center}\small
+    A CNN applies a fixed kernel to a regular grid. A Transformer attends
+    to all tokens and learns the edge weights. A GNN aggregates over a
+    \alert{sparse, problem-specific graph} that the designer provides.
+  \end{center}
+\end{frame}
+\note{The three diagrams make the structural assumption visible. Point at the
+highlighted node in each diagram: it has 8 fixed neighbors (CNN), all other
+tokens (Transformer), or a sparse set of known neighbors (GNN).
+
+The Distill ``A Gentle Introduction to Graph Neural Networks'' (2021) uses a
+similar pixel-grid-to-graph progression. CS224W Lecture 3 has a ``GNNs subsume
+CNNs'' section with the same idea.
+
+Ask the room which architecture fits a collision graph or a particle system.
+The answer is the rightmost diagram.}
 
 % --- 10 ---------------------------------------------------------------
 \begin{frame}{A GNN produces the same output regardless of node ordering}
@@ -690,18 +769,18 @@ CHECKPOINT: 17:48. You promised 17:50. Finish early.}
         \toprule
         layers & test accuracy \\
         \midrule
-        1 & 80.7\% \\
-        \textbf{2} & \textcolor{good}{\textbf{81.1\%}} \\
-        3 & 77.9\% \\
-        4 & 69.2\% \\
-        6 & \textcolor{acc}{\textbf{49.2\%}} \\
-        8 & \textcolor{acc}{\textbf{35.9\%}} \\
+        1 & 75.1\% \\
+        \textbf{2} & \textcolor{good}{\textbf{80.7\%}} \\
+        3 & 78.0\% \\
+        4 & 76.8\% \\
+        6 & \textcolor{acc}{\textbf{74.4\%}} \\
+        8 & \textcolor{acc}{\textbf{61.6\%}} \\
         \bottomrule
       \end{tabular}
 
       \vspace{0.4em}
-      {\scriptsize Layer sweep run with the PyG node-classification tutorial.\\
-       An MLP on the same features reaches 57.1\%.}
+      {\scriptsize From the node-classification notebook (5 seeds each).\\
+       An MLP on the same features reaches 54.7\%.}
     \end{column}
     \begin{column}{0.48\textwidth}
       \footnotesize
@@ -718,10 +797,10 @@ CHECKPOINT: 17:48. You promised 17:50. Finish early.}
     \end{column}
   \end{columns}
 \end{frame}
-\note{Backup. Numbers from the PyG node-classification tutorial on Cora
-(GCN, hidden=16, 5 runs averaged). The MLP baseline (57.1\%) uses the same
-node features without graph structure. The Colab link with our layer sweep
-is on the PyG tutorials slide.
+\note{Backup. Numbers from \texttt{notebooks/pyg\_node\_classification.ipynb}
+(GCN on Cora, hidden=16, 5 seeds averaged). The MLP baseline (54.7\%) uses
+the same features without graph structure. Open the notebook in Colab to see
+the cached outputs and re-run.
 
 Li et al., ``Deeper Insights into Graph Convolutional Networks for
 Semi-Supervised Learning,'' AAAI 2018.}
