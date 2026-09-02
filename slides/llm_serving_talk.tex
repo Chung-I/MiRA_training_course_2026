@@ -304,12 +304,12 @@ read \texttt{num\_key\_value\_heads}, not the name.}
   \end{center}
   \vspace{0.4em}
   \begin{itemize}\small
-    \item \textbf{MHA} gives each query head its own key-value head.
-          Cache size $\propto$ number of heads.
-    \item \textbf{GQA} groups $G$ query heads to share one KV head.
+    \item In \textbf{MHA}, each query head has its own key-value head.
+          Cache size scales with the number of heads.
+    \item In \textbf{GQA}, $G$ query heads share one KV head.
           Llama-3-8B uses $G{=}4$: 32 query heads, 8 KV heads.
-    \item \textbf{MQA} is the extreme: all query heads share one KV head.
-          Faster, but quality degrades on long output.
+    \item In \textbf{MQA}, all query heads share one KV head.
+          MQA is faster than GQA, but quality degrades on long output.
   \end{itemize}
   \vspace{0.3em}
   \begin{center}\small
@@ -319,11 +319,10 @@ read \texttt{num\_key\_value\_heads}, not the name.}
     $\rightarrow$ 46.8).
   \end{center}
 \end{frame}
-\note{\textbf{8:00.} The diagram is the content. Point at the arrows. GQA-8
-means 8 groups, which for Llama-3 means 32/8 = 4 query heads per KV head.
-The uptraining result matters: you can convert an existing MHA checkpoint to
-GQA by mean-pooling the KV projection matrices, then training for 5\% more
-steps.
+\note{\textbf{8:00.} Point at the arrows in the diagram. GQA-8 means 8
+groups: for Llama-3 that is 32/8 = 4 query heads per KV head. The uptraining
+path converts an MHA checkpoint to GQA by mean-pooling the KV projection
+matrices, then training for 5\% more steps.
 
 arXiv:2305.13245.}
 
@@ -1288,10 +1287,10 @@ your table'': we benchmarked it on the wrong workload and kept it to make
 that point.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{Backup: NVFP4 on Blackwell halves FP8 memory again}
+\begin{frame}{Backup: NVFP4 stores weights in 4-bit floats on Blackwell}
   \small
-  NVFP4 is a 4-bit floating-point format: 1 sign bit, 2 exponent bits, 1
-  mantissa bit. It stores values from $-6$ to $+6$.
+  NVFP4 uses 1 sign bit, 2 exponent bits, and 1 mantissa bit. The
+  representable range is $-6$ to $+6$.
   \vspace{0.4em}
   \begin{center}
     \begin{tabular}{lrrr}
@@ -1307,20 +1306,20 @@ that point.}
   \end{center}
   \vspace{0.4em}
   \begin{itemize}\small
-    \item NVFP4 uses \textbf{two-level scaling}: each block of 16 values shares
+    \item NVFP4 scales at \textbf{two levels}: each block of 16 values shares
           an E4M3 scale factor, and the whole tensor has an FP32 scale. The
-          finer block size and floating-point (not power-of-two) scale preserve
-          more dynamic range than MXFP4.
+          16-value block and the floating-point scale preserve more dynamic
+          range than MXFP4, which uses 32-value blocks with a power-of-two
+          scale.
     \item On DeepSeek-R1-0528, NVFP4 lost $\leq$1\% accuracy vs.\ FP8 across
           seven benchmarks. On AIME 2024 it was 2\% \emph{better} than FP8.
     \item Requires \textbf{Blackwell} (fifth-gen Tensor Cores). Not available
           on Hopper or older.
   \end{itemize}
 \end{frame}
-\note{Backup. Use if someone asks about FP4 or Blackwell quantization. The
-two-level scaling is the key: MXFP4 uses a coarser block (32 values) with a
-power-of-two scale, which loses more precision on outlier-heavy weight
-distributions. NVFP4 keeps a floating-point scale on a 16-value block.
+\note{Backup. MXFP4 uses a coarser block (32 values) with a power-of-two
+scale, which loses more precision on outlier-heavy weight distributions.
+NVFP4 keeps a floating-point scale on a 16-value block.
 
 Source: NVIDIA developer blog, ``Introducing NVFP4''.}
 
@@ -1371,9 +1370,9 @@ is a proof of zero quality loss. If you have 30 seconds, use them here.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{\cutbadge{2: trim next} \; Multi-Token Prediction trains the draft head into the model}
-  \textbf{MTP} trains the model to predict $D$ tokens ahead, not just the
-  next one. At inference the extra heads serve as a \emph{built-in draft}
-  for speculative decoding.
+  \textbf{MTP} trains a model to predict $D$ tokens ahead. At inference
+  the extra heads serve as a \emph{built-in draft} for speculative decoding,
+  so no separate draft model is needed.
   \vspace{0.6em}
   \begin{columns}[T]
     \begin{column}{0.52\textwidth}
@@ -1395,14 +1394,14 @@ is a proof of zero quality loss. If you have 30 seconds, use them here.}
   \vspace{0.8em}
   \begin{center}\small
     DeepSeek-V3 ablation ($D{=}1$): HumanEval improved from 20.7\% to 26.8\%
-    (+6.1 points) on the small MoE, and from 44.5\% to 53.7\% (+9.2) on the
-    large MoE. The improvement comes from training, not from inference.
+    (+6.1) on the small MoE, and from 44.5\% to 53.7\% (+9.2) on the large
+    MoE. The auxiliary loss regularizes training, so quality improves even
+    when the extra heads are discarded at inference.
   \end{center}
 \end{frame}
-\note{MTP is both a training technique and an inference technique. The training
-effect is the main one: the auxiliary heads act as a regularizer and improve
-quality even when discarded at inference. The inference effect (speculative
-decoding with no separate draft model) is a bonus.
+\note{The training effect is larger than the inference effect: the auxiliary
+heads regularize and improve quality even when discarded. The inference
+bonus is speculative decoding with no separate draft model.
 
 DeepSeek-V3 technical report (arXiv:2412.19437). NVIDIA NeMo supports MTP via
 \texttt{mtp\_num\_layers} and \texttt{mtp\_loss\_scaling\_factor}.}
