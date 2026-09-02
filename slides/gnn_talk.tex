@@ -609,50 +609,74 @@ CHECKPOINT: 17:28 by the end of this slide. Movement 3 starts now.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{When the known graph wins, and when it does not}
-  \vspace{0.4em}
+  \vspace{0.1em}
+  \begin{center}
+    \begin{tikzpicture}[
+      font=\scriptsize,
+      nd/.style={circle, draw=acc2, fill=acc2!15, minimum size=3.5mm,
+                 inner sep=0pt},
+      hl/.style={circle, draw=acc, fill=acc!20, minimum size=3.5mm,
+                 inner sep=0pt},
+      ed/.style={acc2, line width=0.4pt},
+      eda/.style={dim, line width=0.3pt, opacity=0.4},
+    ]
+    % Left: sparse known graph (GNN wins)
+    \node[font=\small\bfseries, acc2] at (1.8, 2.4) {GNN: sparse, known};
+    \foreach \i/\x/\y in {0/-0.2/1.5, 1/0.7/2.0, 2/1.5/1.3, 3/2.3/1.8,
+                           4/3.0/1.0, 5/3.6/1.7, 6/1.0/0.5, 7/2.5/0.3}
+      \node[nd] (L\i) at (\x,\y) {};
+    \draw[ed] (L0)--(L1); \draw[ed] (L1)--(L2); \draw[ed] (L2)--(L3);
+    \draw[ed] (L3)--(L5); \draw[ed] (L2)--(L4); \draw[ed] (L4)--(L5);
+    \draw[ed] (L0)--(L6); \draw[ed] (L6)--(L7); \draw[ed] (L4)--(L7);
+    \node[font=\tiny, color=dim, align=center] at (1.8, -0.15)
+      {contacts, mesh, radio range};
+
+    % Right: complete graph (Transformer wins)
+    \node[font=\small\bfseries, acc] at (8.2, 2.4) {Transformer: all-to-all};
+    \foreach \i/\x/\y in {0/6.5/1.6, 1/7.2/2.0, 2/8.0/1.8, 3/8.8/1.5,
+                           4/7.0/0.7, 5/8.0/0.5, 6/9.0/0.8, 7/9.6/1.3}
+      \node[hl] (R\i) at (\x,\y) {};
+    \foreach \i in {0,...,7} {
+      \foreach \j in {\i,...,7} {
+        \ifnum\i<\j \draw[eda] (R\i)--(R\j); \fi
+      }
+    }
+    \node[font=\tiny, color=dim, align=center] at (8.2, -0.15)
+      {limbs, tokens, patches};
+
+    % divider
+    \draw[black!20, dashed] (5.1, -0.3) -- (5.1, 2.6);
+    \end{tikzpicture}
+  \end{center}
+  \vspace{-0.1em}
   \begin{columns}[T]
-    \begin{column}{0.48\textwidth}
-      \textbf{Encode the known graph} when the interaction structure is
-      \alert{physical, sparse, and cheap to compute}: contacts, mesh edges,
-      communication range.
-      \vspace{0.5em}
-
-      GNS generalizes from thousands of particles to $10\times$ more.
-      Li \& Prorok's planner generalizes to larger robot teams.
+    \begin{column}{0.47\textwidth}
+      \small
+      GNS generalizes to $10\times$ more particles.
       RoboBallet generalizes zero-shot to new placements.
-      \vspace{0.4em}
+      Li \& Prorok's planner scales to larger teams.
+      \vspace{0.2em}
 
-      \arx{2002.09405} \arx{1912.06095} \arx{2509.05397}
+      {\scriptsize\color{dim}\arx{2002.09405}\ \arx{2509.05397}\ \arx{1912.06095}}
     \end{column}
-    \begin{column}{0.48\textwidth}
-      \textbf{Learn the edges with attention} when the graph is an artifact,
-      long-range interactions dominate, or data is plentiful.
-      \vspace{0.5em}
+    \begin{column}{0.47\textwidth}
+      \small
+      Amorpheus (ICLR 2021): encoding the kinematic tree
+      \alert{hurt} morphology control. Point Transformer v3 (CVPR 2024)
+      displaced DGCNN on point clouds.
+      \vspace{0.2em}
 
-      Kurin et al.\ (Amorpheus, ICLR 2021) showed that encoding the
-      \alert{kinematic tree hurts} morphology control: a Transformer over
-      limbs outperformed the GNN that used the physical graph.
-      The stated reason: multi-hop propagation through a sparse tree
-      loses gradient signal.
+      {\scriptsize\color{dim}\arx{2106.03672}\ \arx{2408.16932}}
     \end{column}
   \end{columns}
-  \vspace{0.6em}
-  \begin{center}\small
-    Point Transformer v3 (CVPR 2024) displaced DGCNN on point clouds for
-    the same reason: the k-NN graph is geometric, but attention over all
-    points captures global context that local message passing misses.
-  \end{center}
 \end{frame}
-\note{The decision rule from the deep-research review: encode the sparse graph
-when (a) the edges are physical and cheap to compute, (b) you need size
-generalization, and (c) data is limited. Learn the edges when the ``graph'' is
-a modeling artifact or data is abundant.
+\note{The two diagrams show the structural assumption side by side.
+Left: a sparse graph where each node connects to a few physical neighbors.
+Right: a complete graph where attention learns which connections matter.
 
-The Amorpheus result is the counterexample that teaches judgment: the physical
-graph existed and hurt. Reading GNS and Amorpheus back to back gives the
-decision rule.
-
-arXiv:2106.03672 (Amorpheus), arXiv:2408.16932 (PT v3).}
+The decision rule: encode the sparse graph when the edges are physical, cheap
+to compute, and you need size generalization with limited data. Learn the edges
+when the graph is an artifact or data is abundant.}
 
 
 % =========================================================================
@@ -661,19 +685,17 @@ arXiv:2106.03672 (Amorpheus), arXiv:2408.16932 (PT v3).}
 
 % --- 13 ---------------------------------------------------------------
 \begin{frame}{When \emph{not} to use a GNN}
-  \vspace{0.8em}
+  \vspace{0.6em}
   \begin{itemize}
-    \setlength{\itemsep}{0.8em}
-    \item If the graph is \textbf{small and dense}, a Transformer computes the
-      same thing on a complete graph, and the tooling is better.
-    \item If you \textbf{invented the edges} to make it a graph, you invented a
-      prior, and it can be wrong. Kurin et al.\ (ICLR 2021) showed
-      that encoding the kinematic tree \alert{hurt} morphology control.
-    \item If the data is a \textbf{grid or a sequence}, a CNN or a Transformer
-      already encodes that structure.
-    \item If you have \textbf{abundant data or pretraining}, a Transformer can
-      learn the edges from scratch. RT-1/2, Octo, OpenVLA and $\pi_0$
-      are Transformer-native VLA policies.
+    \setlength{\itemsep}{0.6em}
+    \item \textbf{Small and dense graph}: a Transformer computes the same thing
+      on a complete graph, and the tooling is better.
+    \item \textbf{Invented edges}: Kurin et al.\ (ICLR 2021) showed that
+      encoding the kinematic tree \alert{hurt} morphology control.
+    \item \textbf{Grid or sequence}: a CNN or Transformer already encodes
+      that structure.
+    \item \textbf{Abundant data}: RT-1/2, Octo, OpenVLA and $\pi_0$ learn
+      edges from scratch as Transformer-native VLA policies.
   \end{itemize}
   \vfill
   \begin{center}\large
@@ -715,26 +737,20 @@ Give them five seconds of silence to test their own project against it.}
   \begin{center}
     \large
     A GNN repeats one operation: \alert{each node aggregates its neighbors,
-    then updates its own vector.}\\[0.8em]
-    \alert{Graph construction} decides performance. The layer architecture
-    matters less.
+    then updates its own vector.}\\[0.6em]
+    \alert{Graph construction} decides performance.
   \end{center}
-  \vspace{1.1em}
+  \vspace{0.6em}
   \hrule
-  \vspace{0.7em}
-  \footnotesize
+  \vspace{0.4em}
+  \scriptsize
   \textbf{Five papers to read, in order}
-  \begin{itemize}\setlength{\itemsep}{0.15em}
-    \item Joshi, ``Transformers are Graph Neural Networks'' (2020/2025): the
-      equivalence stated as a mapping.
-    \item Sanchez-Gonzalez et al., GNS (ICML 2020): the canonical ``encode
-      the physical graph'' success. \arx{2002.09405}
-    \item Kurin et al., Amorpheus (ICLR 2021): the counterexample where
-      the physical graph hurt. \arx{2106.03672}
-    \item Ramp\'{a}\v{s}ek et al., GraphGPS (NeurIPS 2022): the hybrid
-      recipe. \arx{2205.12454}
-    \item T\"{o}nshoff et al., ``Where Did the Gap Go?'' (LoG 2023):
-      tuned MPNNs close most of the Transformer gap. \arx{2309.00367}
+  \begin{itemize}\setlength{\itemsep}{0.05em}
+    \item Joshi, ``Transformers are Graph Neural Networks'' (2020/2025)
+    \item Sanchez-Gonzalez et al., GNS (ICML 2020) \arx{2002.09405}
+    \item Kurin et al., Amorpheus (ICLR 2021) \arx{2106.03672}
+    \item Ramp\'{a}\v{s}ek et al., GraphGPS (NeurIPS 2022) \arx{2205.12454}
+    \item T\"{o}nshoff et al., ``Where Did the Gap Go?'' (LoG 2023) \arx{2309.00367}
   \end{itemize}
 \end{frame}
 \note{Say the one-thing sentence one last time, word for word as on slide 2. Then give the resources, fast.
