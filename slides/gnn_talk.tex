@@ -310,13 +310,8 @@ changes on screen.}
 \note{40 seconds. The audience already believes this one.}
 
 % --- 11 ----------------------------------------------------------------
-\begin{frame}{``Isn't attention already a graph?'' Yes, a fully-connected one}
-  \vspace{0.8em}
-  \begin{center}\large
-    A Transformer \alert{is} a GNN on a complete graph,\\
-    with attention as the aggregation.
-  \end{center}
-  \vspace{1.2em}
+\begin{frame}{A Transformer is a GNN on the complete graph}
+  \vspace{0.4em}
   \begin{center}
     \begin{tikzpicture}[scale=0.85, every node/.style={transform shape},
       n/.style={circle, draw=acc2, fill=acc2!15, minimum size=5mm, inner sep=0pt}]
@@ -325,27 +320,84 @@ changes on screen.}
         \foreach \i/\j in {0/1,0/2,0/3,0/4,0/5,1/2,1/3,1/4,1/5,
                            2/3,2/4,2/5,3/4,3/5,4/5}
           \draw[dim, opacity=0.6] (a\i)--(a\j);
-        \node at (0,-1.75) {\small Transformer: \emph{learn} the edges};
+        \node at (0,-1.75) {\small Transformer: all-to-all attention};
       \end{scope}
       \begin{scope}[xshift=6cm]
         \foreach \i in {0,...,5} \node[n] (b\i) at (\i*60:1.1) {};
         \foreach \i/\j in {0/1,1/2,2/3,3/4,4/5,5/0,0/3}
           \draw[acc, thick] (b\i)--(b\j);
-        \node at (0,-1.75) {\small GNN: you \emph{already know} the edges};
+        \node at (0,-1.75) {\small GNN: sparse, known edges};
       \end{scope}
     \end{tikzpicture}
   \end{center}
-  \vfill
-  \begin{center}
-    Which particles touch, and which arms can collide, is known from the geometry.
-    \alert{A GNN takes that as its edge set. A Transformer has to learn the same
-    structure from data.}
-  \end{center}
+  \vspace{0.3em}
+  \begin{itemize}\small
+    \item Self-attention sends a message $m_{ij} = \mathrm{softmax}_j(q_i
+          \cdot k_j / \sqrt{d})\, W_v h_j$ from every token $j$ to every
+          token $i$. That is MSG + AGG on the complete graph.
+    \item GAT restricts the same computation to real edges, with additive
+          instead of dot-product attention.
+    \item The equivalence breaks at three points: \alert{positional encodings}
+          (without them, the Transformer treats its input as a set),
+          the \alert{feed-forward block} (per-node, no graph analogue),
+          and \alert{LayerNorm / residual stream}.
+  \end{itemize}
 \end{frame}
 \note{Ask the smartest question in the room before anyone else does. This removes
 the objection that otherwise stays with a listener for 20 minutes.
 
+The mapping (Joshi 2020/2025, Dwivedi \& Bresson 2021): nodes = tokens,
+edges = all-to-all, MSG = value vector scaled by softmax attention, AGG = sum.
+GAT is the sparse case. The FFN, residual, and LayerNorm are non-graph parts.
+
 CHECKPOINT: 17:28 by the end of this slide. Movement 3 starts now.}
+
+% -------------------------------------------------------------------------
+\begin{frame}{When the known graph wins, and when it does not}
+  \vspace{0.4em}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \textbf{Encode the known graph} when the interaction structure is
+      \alert{physical, sparse, and cheap to compute}: contacts, mesh edges,
+      communication range.
+      \vspace{0.5em}
+
+      GNS generalizes from thousands of particles to $10\times$ more.
+      Li \& Prorok's planner generalizes to larger robot teams.
+      RoboBallet generalizes zero-shot to new placements.
+      \vspace{0.4em}
+
+      \arx{2002.09405} \arx{1912.06095} \arx{2509.05397}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{Learn the edges with attention} when the graph is an artifact,
+      long-range interactions dominate, or data is plentiful.
+      \vspace{0.5em}
+
+      Kurin et al.\ (Amorpheus, ICLR 2021) showed that encoding the
+      \alert{kinematic tree hurts} morphology control: a Transformer over
+      limbs outperformed the GNN that used the physical graph.
+      The stated reason: multi-hop propagation through a sparse tree
+      loses gradient signal.
+    \end{column}
+  \end{columns}
+  \vspace{0.6em}
+  \begin{center}\small
+    Point Transformer v3 (CVPR 2024) displaced DGCNN on point clouds for
+    the same reason: the k-NN graph is geometric, but attention over all
+    points captures global context that local message passing misses.
+  \end{center}
+\end{frame}
+\note{The decision rule from the deep-research review: encode the sparse graph
+when (a) the edges are physical and cheap to compute, (b) you need size
+generalization, and (c) data is limited. Learn the edges when the ``graph'' is
+a modeling artifact or data is abundant.
+
+The Amorpheus result is the counterexample that teaches judgment: the physical
+graph existed and hurt. Reading GNS and Amorpheus back to back gives the
+decision rule.
+
+arXiv:2106.03672 (Amorpheus), arXiv:2408.16932 (PT v3).}
 
 % --- 12 ----------------------------------------------------------------
 \begin{frame}{One idea: each node makes a summary of its neighbors, then repeats}
@@ -741,7 +793,45 @@ give them the rule, which holds either way.
 
 If you need long-range information, add a global node or a hierarchy. Do not add depth.}
 
-% --- 21 ----------------------------------------------------------------
+% -------------------------------------------------------------------------
+\begin{frame}{Over-squashing: depth does not fix long-range dependencies}
+  \vspace{0.6em}
+  \begin{columns}[T]
+    \begin{column}{0.50\textwidth}
+      Information from an exponentially growing receptive field is compressed
+      into a \alert{fixed-size vector}. Alon \& Yahav (ICLR 2021) identified
+      this as a bottleneck distinct from over-smoothing.
+      \vspace{0.6em}
+
+      Topping et al.\ (ICLR 2022) formalized the bottleneck via
+      \alert{negative Ollivier-Ricci curvature} on edges and proposed graph
+      rewiring (SDRF) to relieve it.
+    \end{column}
+    \begin{column}{0.46\textwidth}
+      Di Giovanni et al.\ (ICML 2023) proved:
+      \begin{itemize}\small\setlength{\itemsep}{0.3em}
+        \item \alert{Width} mitigates over-squashing.
+        \item \alert{Depth does not help}: it hits vanishing gradients before
+              it fixes the bottleneck.
+        \item \alert{Topology dominates}: over-squashing occurs between nodes
+              with high commute time.
+      \end{itemize}
+      \vspace{0.4em}
+      Fixes: widen the network, add a virtual global node, or rewire the graph.
+    \end{column}
+  \end{columns}
+\end{frame}
+\note{Over-squashing is the rigorous justification for graph rewiring. Full
+attention removes the topological bottleneck (every node is one hop from every
+other), which is the strongest ``attention fixes MPNN pathology'' argument.
+But attention introduces its own pathology: Dong et al.\ (ICML 2021) proved
+pure self-attention converges doubly exponentially to a rank-1 matrix. The
+residual stream and FFN prevent that collapse.
+
+arXiv:2006.05205 (Alon \& Yahav), arXiv:2111.14522 (Topping), arXiv:2302.02941
+(Di Giovanni).}
+
+% -------------------------------------------------------------------------
 \begin{frame}[fragile]{A complete GNN in 12 lines of PyTorch Geometric}
 \vspace{-0.2em}
 \begingroup\lstset{basicstyle=\ttfamily\footnotesize}
@@ -772,83 +862,69 @@ is the line the last twenty minutes were about.
 If someone asks about libraries: PyTorch Geometric. If you need heterogeneous graphs, use DGL.}
 
 % --- 22 ----------------------------------------------------------------
-\begin{frame}[fragile]{The notebook runs on a free Colab CPU}
-  \vspace{0.5em}
-  \begin{center}
-    \small\texttt{\href{https://colab.research.google.com/github/Chung-I/MiRA_training_course_2026/blob/main/notebooks/gnn_demo.ipynb}{colab.research.google.com/github/Chung-I/MiRA\_training\_course\_2026/}}\\
-    \small\texttt{blob/main/notebooks/gnn\_demo.ipynb}
+\begin{frame}{PyTorch Geometric tutorials on Colab}
+  \vspace{0.4em}
+  \begin{center}\small
+    \textbf{Official PyG Colab notebooks}
+    \quad{\scriptsize\url{https://pytorch-geometric.readthedocs.io/en/latest/get\_started/colabs.html}}
   \end{center}
-  \vspace{0.8em}
-  \begin{columns}[T]
-    \begin{column}{0.52\textwidth}
-      \small
-      PyTorch and NumPy only. I wrote message passing by hand so that you can
-      read each line. PyTorch Geometric appears once, at the end, as an option.
-      \vspace{0.8em}
-
-      \textbf{Demos in the notebook:}
-      \begin{itemize}
-        \item \alert{Demo 4}: node features are \emph{pure noise}
-        \item \alert{Demo 5}: k-NN at $k = 3, 8, 20$
-      \end{itemize}
-    \end{column}
-    \begin{column}{0.44\textwidth}
-      \centering
-      \vspace{0.2em}
-      {\small Demo 4: two communities, 200 nodes,\\ features carry \emph{no}
-       information}
-      \vspace{0.5em}
-
-      \begin{tabular}{@{}lr@{}}
-        \toprule
-        MLP on features only & 51.2\% \\
-        2-layer GCN          & \textcolor{good}{\textbf{91.3\%}} \\
-        \bottomrule
-      \end{tabular}
-
-      \vspace{0.8em}
-      \small\alert{The features are random, so the whole 40-point gap comes from the edges.}
-    \end{column}
-  \end{columns}
+  \vspace{0.6em}
+  \begin{itemize}\small
+    \setlength{\itemsep}{0.6em}
+    \item \href{https://colab.research.google.com/drive/1h3-vJGRVloF5zStxL5I0rSy4ZUPNsjy8}{\textbf{Introduction}}:
+          GNN fundamentals, the \texttt{Data} object, and a first GCN.
+    \item \href{https://colab.research.google.com/drive/14OvFnAXggxB8vM4e8vSURUp1TaKnovzX}{\textbf{Node classification}}:
+          semi-supervised classification on Cora with GCN, GAT, GraphSAGE.
+          Maps directly to slide 15 (the AGG table).
+    \item \href{https://colab.research.google.com/drive/1I8a0DfQ3fI7Njc62__mVXUlcAleUclnb}{\textbf{Graph classification}}:
+          whole-graph prediction with readout pooling.
+          Maps directly to slide 16 (graph-level row).
+    \item \href{https://colab.research.google.com/drive/1D45E5bUK3gQ40YpZo65ozs7hg5l-eo_U}{\textbf{Point cloud classification}}:
+          3D point clouds as graphs, the robotics entry point.
+  \end{itemize}
+  \vspace{0.6em}
+  \begin{center}\small\color{dim}
+    All four run on a free Colab CPU or T4. No local installs needed.
+  \end{center}
 \end{frame}
-\note{*** SWITCH TO THE COLAB NOTEBOOK HERE. ***
+\note{These are the official PyG tutorials, maintained by the PyG team. Each one
+is self-contained and installs PyG inside the notebook.
 
-Run Demo 4 first. It is the strongest number in the talk: 51\% vs 91\% with
-features from torch.randn. Then run Demo 5 for the k-NN picture.
-
-If the room is dead, run Demo 1 instead (the MLP output changes when you
-renumber the nodes). It is faster and more visual.
-
-Budget 3 minutes on the notebook, hard stop. If a cell fails, do not debug
-live. Return to the slides and tell them that the link is in the repo.
+If time allows, open the Introduction notebook and run the first GCN cell live.
+Budget 2 minutes. If a cell fails, close it and say the link is on this slide.
 
 CHECKPOINT: back on slides by 17:44.}
 
 % --- 23 ----------------------------------------------------------------
 \begin{frame}{When \emph{not} to use a GNN}
-  \vspace{1.0em}
+  \vspace{0.8em}
   \begin{itemize}
-    \setlength{\itemsep}{1.0em}
-    \item If the graph is \textbf{small and dense}, a Transformer is the better
-      choice: the tooling is better, and on a complete graph it computes the
-      same thing.
+    \setlength{\itemsep}{0.8em}
+    \item If the graph is \textbf{small and dense}, a Transformer computes the
+      same thing on a complete graph, and the tooling is better.
     \item If you \textbf{invented the edges} to make it a graph, you invented a
-      prior, and it can be wrong.
+      prior, and it can be wrong. Kurin et al.\ (ICLR 2021) showed
+      that encoding the kinematic tree \alert{hurt} morphology control.
     \item If the data is a \textbf{grid or a sequence}, a CNN or a Transformer
       already encodes that structure.
+    \item If you have \textbf{abundant data or pretraining}, a Transformer can
+      learn the edges from scratch. RT-1/2, Octo, OpenVLA and $\pi_0$
+      are Transformer-native VLA policies.
   \end{itemize}
   \vfill
   \begin{center}\large
     A GNN outperforms a Transformer when the \alert{interaction graph is
-    sparse, known, and too large to learn from data}.
+    sparse, physically real, and the data is limited}.
   \end{center}
 \end{frame}
-\note{This slide earns trust by showing when not to use the method.
+\note{The Amorpheus result (Kurin et al.\ 2021) is the counterexample that
+teaches judgment: the physical graph existed and hurt. Point Transformer v3
+displaced DGCNN on point clouds. The whole VLA stack is Transformer-native.
 
-Expected question: "are GNNs still relevant now that everything is a
-transformer?" Answer: RoboBallet is from 2025, and the learned-simulator line
-is active. If the interaction structure is known and sparse, an encoded graph
-beats a learned graph, especially with limited data.}
+But RoboBallet (Science Robotics 2025), the learned-simulator line (GNS,
+MeshGraphNets), and multi-robot coordination (Li \& Prorok) all held with
+GNNs. The field has converged on hybrids (GraphGPS), but T\"onshoff et al.\
+(LoG 2023) showed that tuned MPNNs close most of the reported gap.}
 
 % --- 24 ----------------------------------------------------------------
 \begin{frame}{When is a problem a graph?}
@@ -883,15 +959,18 @@ Give them five seconds of silence to test their own project against it.}
   \hrule
   \vspace{0.7em}
   \footnotesize
-  \textbf{Where to learn more}
+  \textbf{Five papers to read, in order}
   \begin{itemize}\setlength{\itemsep}{0.15em}
-    \item If you want the full picture, take Stanford \textbf{CS224W}.
-    \item For the fastest way to a working model, read the \textbf{PyTorch
-      Geometric} \texttt{examples/} directory.
-    \item For one afternoon of pictures, read Distill, \emph{A Gentle
-      Introduction to Graph Neural Networks}.
-    \item If you want the framing in full, read the position paper:
-      Battaglia et al., \arx{1806.01261}.
+    \item Joshi, ``Transformers are Graph Neural Networks'' (2020/2025): the
+      equivalence stated as a mapping.
+    \item Sanchez-Gonzalez et al., GNS (ICML 2020): the canonical ``encode
+      the physical graph'' success. \arx{2002.09405}
+    \item Kurin et al., Amorpheus (ICLR 2021): the counterexample where
+      the physical graph hurt. \arx{2106.03672}
+    \item Ramp\'{a}\v{s}ek et al., GraphGPS (NeurIPS 2022): the hybrid
+      recipe. \arx{2205.12454}
+    \item T\"{o}nshoff et al., ``Where Did the Gap Go?'' (LoG 2023):
+      tuned MPNNs close most of the Transformer gap. \arx{2309.00367}
   \end{itemize}
 \end{frame}
 \note{Say the one-thing sentence one last time, word for word as on slide 2. Then give the resources, fast.
@@ -912,20 +991,40 @@ CHECKPOINT: 17:48. You promised 17:50. Finish early.}
 \end{frame}
 \note{Q\&A prep:
 
-* "Isn't a Transformer just a GNN?" -> Yes, on a complete graph. Use a GNN when
-  you know the sparse structure and do not want to spend data on it.
-* "How many layers?" -> Start at 2. Over-smoothing bites at 4. For long-range
-  information, add a global node or a hierarchy. Do not add depth.
-* "How do I build the graph for a point cloud?" -> k-NN with k around 16-20 in
-  xyz, edge feature = relative position. DGCNN recomputes it in feature space
-  each layer.
-* "Do GNNs scale?" -> Neighbor sampling or graph clustering. Most robotics
-  graphs are under 10k nodes, so you will not reach this limit.
-* "Are GNNs still relevant?" -> RoboBallet (2025) and the learned-simulator
-  line. A known, sparse structure beats a learned one, especially with little data.
-* "Which library?" -> PyTorch Geometric. DGL for heterogeneous graphs.
-* Out of scope on purpose: spectral graph theory / the Laplacian, the WL test
-  and expressiveness, graph transformers, over-squashing, positional encodings,
-  heterogeneous / temporal / knowledge graphs.}
+* "Isn't a Transformer just a GNN?" -> Yes: self-attention is message passing
+  on the complete graph, where the message is a value vector scaled by softmax
+  attention. GAT is the same computation restricted to real edges. The
+  equivalence breaks at positional encodings (without them, a Transformer treats
+  its input as a set), the per-token FFN (no graph analogue), and LayerNorm.
+  (Joshi 2020/2025, Dwivedi \& Bresson 2021.)
+
+* "How many layers?" -> Start at 2. Over-smoothing collapses representations
+  at 4--6 layers. Over-squashing (Alon \& Yahav 2021) is a separate problem:
+  information from an exponentially growing receptive field compresses into a
+  fixed-size vector. Di Giovanni et al.\ (ICML 2023) proved that depth does
+  not fix it --- widen the network, or add a global node, or rewire.
+
+* "How do I build the graph for a point cloud?" -> k-NN with k around 16--20
+  in xyz, edge feature = relative position. DGCNN recomputes edges in feature
+  space each layer. Point Transformer v3 (CVPR 2024) now leads on S3DIS and
+  SemanticKITTI by replacing the k-NN graph with full attention over points.
+
+* "Are GNNs still relevant?" -> RoboBallet (Science Robotics 2025) and the
+  learned-simulator line (GNS, MeshGraphNets) are active. A known sparse
+  graph wins on sample efficiency and size generalization. But Amorpheus
+  (ICLR 2021) showed the kinematic tree hurts morphology control, and VLA
+  policies (RT-1/2, Octo, OpenVLA, pi0) are Transformer-native. The field
+  has converged on hybrids (GraphGPS: local MPNN + global attention + PE).
+  T\"onshoff et al.\ (LoG 2023) showed that tuned MPNNs close most of the
+  reported graph-transformer gap on long-range benchmarks.
+
+* "Which library?" -> PyTorch Geometric (PyG). DGL if you need heterogeneous
+  graphs. The four official PyG Colab tutorials are on the previous slide.
+
+* "What about expressiveness / WL?" -> One sentence: MPNNs are bounded by
+  1-WL (Xu et al.\ 2019). Graph transformers with the right positional
+  encodings exceed 1-WL and reach between 1-WL and 3-WL (TokenGT, Graphormer,
+  GRIT). But higher WL expressiveness does not reliably predict benchmark
+  accuracy. Give the sentence and move on.}
 
 \end{document}
