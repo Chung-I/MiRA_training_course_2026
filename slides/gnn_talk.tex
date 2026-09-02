@@ -310,135 +310,7 @@ the mapping and stop.}
 
 
 
-% =========================================================================
-% Failure modes and code
-% =========================================================================
-
 % --- 8 ----------------------------------------------------------------
-\begin{frame}{Deeper is worse: over-smoothing after 3 layers}
-  \vspace{0.2em}
-  \begin{columns}[c]
-    \begin{column}{0.48\textwidth}
-      \centering\small
-      \textbf{GCN on Cora} (2,708 nodes, 7 classes, hidden=16)
-      \vspace{0.3em}
-
-      \begin{tabular}{@{}rr@{}}
-        \toprule
-        layers & test accuracy \\
-        \midrule
-        1 & 80.7\% \\
-        \textbf{2} & \textcolor{good}{\textbf{81.1\%}} \\
-        3 & 77.9\% \\
-        4 & 69.2\% \\
-        6 & \textcolor{acc}{\textbf{49.2\%}} \\
-        8 & \textcolor{acc}{\textbf{35.9\%}} \\
-        \bottomrule
-      \end{tabular}
-
-      \vspace{0.4em}
-      {\scriptsize Measured with the PyG node-classification tutorial.\\
-       An MLP on the same features reaches 57.1\%.}
-    \end{column}
-    \begin{column}{0.48\textwidth}
-      \footnotesize
-      After enough rounds of averaging with neighbors, \alert{each node in a
-      connected graph holds the same vector}. Li et al.\ (AAAI 2018) identified
-      this as over-smoothing.
-      \vspace{0.5em}
-
-      \textbf{Two caveats:}
-      \begin{itemize}\setlength{\itemsep}{0.3em}
-        \item The cliff mixes over-smoothing with the difficulty of
-          \alert{deep GCN training} without residual connections.
-        \item On Cora, the optimum is \alert{2 layers}. Deeper GCNs rarely
-          help unless the graph has been rewired (see over-squashing).
-      \end{itemize}
-    \end{column}
-  \end{columns}
-\end{frame}
-\note{Numbers measured by running the official PyG node-classification tutorial
-on Cora with GCN (hidden=16, 5 runs averaged). The MLP baseline (57.1\%) uses
-the same node features without any graph structure.
-
-The live demo: open the tutorial, change num\_layers, and re-run. Accuracy
-visibly drops at 6 and 8 layers.
-
-Li et al., ``Deeper Insights into Graph Convolutional Networks for
-Semi-Supervised Learning,'' AAAI 2018.
-
-If you need long-range information, add a global node or a hierarchy. Do not
-add depth.}
-
-% -------------------------------------------------------------------------
-\begin{frame}{Over-squashing: depth does not fix long-range dependencies}
-  \vspace{0.6em}
-  \begin{columns}[T]
-    \begin{column}{0.50\textwidth}
-      Information from an exponentially growing receptive field is compressed
-      into a \alert{fixed-size vector}. Alon \& Yahav (ICLR 2021) identified
-      this as a bottleneck distinct from over-smoothing.
-      \vspace{0.6em}
-
-      Topping et al.\ (ICLR 2022) formalized the bottleneck via
-      \alert{negative Ollivier-Ricci curvature} on edges and proposed graph
-      rewiring (SDRF) to relieve it.
-    \end{column}
-    \begin{column}{0.46\textwidth}
-      Di Giovanni et al.\ (ICML 2023) proved:
-      \begin{itemize}\small\setlength{\itemsep}{0.3em}
-        \item \alert{Width} mitigates over-squashing.
-        \item \alert{Depth does not help}: it hits vanishing gradients before
-              it fixes the bottleneck.
-        \item \alert{Topology dominates}: over-squashing occurs between nodes
-              with high commute time.
-      \end{itemize}
-      \vspace{0.4em}
-      Fixes: widen the network, add a virtual global node, or rewire the graph.
-    \end{column}
-  \end{columns}
-\end{frame}
-\note{Over-squashing is the rigorous justification for graph rewiring. Full
-attention removes the topological bottleneck (every node is one hop from every
-other), which is the strongest ``attention fixes MPNN pathology'' argument.
-But attention introduces its own pathology: Dong et al.\ (ICML 2021) proved
-pure self-attention converges doubly exponentially to a rank-1 matrix. The
-residual stream and FFN prevent that collapse.
-
-arXiv:2006.05205 (Alon \& Yahav), arXiv:2111.14522 (Topping), arXiv:2302.02941
-(Di Giovanni).}
-
-% -------------------------------------------------------------------------
-\begin{frame}[fragile]{A complete GNN in 12 lines of PyTorch Geometric}
-\vspace{-0.2em}
-\begingroup\lstset{basicstyle=\ttfamily\footnotesize}
-\begin{lstlisting}
-from torch_geometric.nn import GCNConv
-from torch_geometric.data import Data
-
-data = Data(x=X, edge_index=A.nonzero().t().contiguous(), y=y)
-
-class GCN(nn.Module):
-    def __init__(self, d_in, d_hid, d_out):
-        super().__init__()
-        self.c1, self.c2 = GCNConv(d_in, d_hid), GCNConv(d_hid, d_out)
-
-    def forward(self, d):
-        h = F.relu(self.c1(d.x, d.edge_index))
-        return self.c2(h, d.edge_index)
-\end{lstlisting}
-\endgroup
-\vspace{-0.2em}
-\begin{center}
-  \small \alert{The hard decision sits on line 4}, where you chose the edges.
-\end{center}
-\end{frame}
-\note{Do not read the code. Point at line 4, \texttt{edge\_index}, and say that this
-is the line the last twenty minutes were about.
-
-If someone asks about libraries: PyTorch Geometric. If you need heterogeneous graphs, use DGL.}
-
-% --- 9 ----------------------------------------------------------------
 \begin{frame}{PyTorch Geometric tutorials on Colab}
   \vspace{0.2em}
   \begin{center}\small
@@ -484,8 +356,7 @@ notebook.
 
 The node-classification result (MLP 57.1\% vs GCN 81.1\%) is the single most
 useful number in the talk for explaining why graph structure matters. The
-over-smoothing table on the previous slide comes from the same tutorial with
-the layer count varied.
+over-smoothing layer sweep is in the appendix.
 
 If time allows, open the node-classification notebook and change num\_layers
 live. Budget 2 minutes. If a cell fails, close it and point at this slide.
@@ -497,7 +368,7 @@ CHECKPOINT: back on slides by 17:44.}
 % Movement 3: GNNs and Transformers
 % =========================================================================
 
-% --- 10 ---------------------------------------------------------------
+% --- 9 ----------------------------------------------------------------
 \begin{frame}{What does a CNN assume? What does a Transformer assume?}
   \vspace{1.4em}
   \begin{columns}[T]
@@ -522,7 +393,7 @@ for the next 25 minutes.
 
 If nobody answers within five seconds, answer it yourself and move on.}
 
-% --- 11 ---------------------------------------------------------------
+% --- 10 ---------------------------------------------------------------
 \begin{frame}{Flattening fails: relabel the nodes and the answer changes}
   \vspace{0.4em}
   An MLP takes six objects on a table as one flattened vector.
@@ -549,7 +420,7 @@ If nobody answers within five seconds, answer it yourself and move on.}
 \note{The PyG Introduction tutorial shows this: renumber the nodes in a small
 graph and the MLP output changes, while the GCN output stays the same.}
 
-% --- 12 ---------------------------------------------------------------
+% --- 11 ---------------------------------------------------------------
 \begin{frame}{Flattening fails: the number of objects changes}
   \vspace{1.2em}
   \begin{center}
@@ -570,7 +441,7 @@ graph and the MLP output changes, while the GCN output stays the same.}
 \end{frame}
 \note{40 seconds. The audience already believes this one.}
 
-% --- 13 ---------------------------------------------------------------
+% --- 12 ---------------------------------------------------------------
 \begin{frame}{A Transformer is a GNN on the complete graph}
   \vspace{0.4em}
   \begin{center}
@@ -665,7 +536,7 @@ arXiv:2106.03672 (Amorpheus), arXiv:2408.16932 (PT v3).}
 % Close
 % =========================================================================
 
-% --- 14 ---------------------------------------------------------------
+% --- 13 ---------------------------------------------------------------
 \begin{frame}{When \emph{not} to use a GNN}
   \vspace{0.8em}
   \begin{itemize}
@@ -696,7 +567,7 @@ MeshGraphNets), and multi-robot coordination (Li \& Prorok) all held with
 GNNs. The field has converged on hybrids (GraphGPS), but T\"onshoff et al.\
 (LoG 2023) showed that tuned MPNNs close most of the reported gap.}
 
-% --- 15 ---------------------------------------------------------------
+% --- 14 ---------------------------------------------------------------
 \begin{frame}{When is a problem a graph?}
   \vspace{1.2em}
   \begin{enumerate}
@@ -715,7 +586,7 @@ problem is a graph.
 
 Give them five seconds of silence to test their own project against it.}
 
-% --- 16 ---------------------------------------------------------------
+% --- 15 ---------------------------------------------------------------
 \begin{frame}{Take-home}
   \vspace{0.2em}
   \begin{center}
@@ -747,7 +618,7 @@ Give them five seconds of silence to test their own project against it.}
 
 CHECKPOINT: 17:48. You promised 17:50. Finish early.}
 
-% --- 17 ---------------------------------------------------------------
+% --- 16 ---------------------------------------------------------------
 \begin{frame}[plain]
   \vspace{2.2em}
   \begin{center}
@@ -796,5 +667,57 @@ CHECKPOINT: 17:48. You promised 17:50. Finish early.}
   encodings exceed 1-WL and reach between 1-WL and 3-WL (TokenGT, Graphormer,
   GRIT). But higher WL expressiveness does not reliably predict benchmark
   accuracy. Give the sentence and move on.}
+
+% =========================================================================
+\appendix
+% =========================================================================
+
+\begin{frame}{Backup: over-smoothing after 3 layers (GCN on Cora)}
+  \vspace{0.2em}
+  \begin{columns}[c]
+    \begin{column}{0.48\textwidth}
+      \centering\small
+      \textbf{GCN on Cora} (2,708 nodes, 7 classes, hidden=16)
+      \vspace{0.3em}
+
+      \begin{tabular}{@{}rr@{}}
+        \toprule
+        layers & test accuracy \\
+        \midrule
+        1 & 80.7\% \\
+        \textbf{2} & \textcolor{good}{\textbf{81.1\%}} \\
+        3 & 77.9\% \\
+        4 & 69.2\% \\
+        6 & \textcolor{acc}{\textbf{49.2\%}} \\
+        8 & \textcolor{acc}{\textbf{35.9\%}} \\
+        \bottomrule
+      \end{tabular}
+
+      \vspace{0.4em}
+      {\scriptsize Layer sweep run with the PyG node-classification tutorial.\\
+       An MLP on the same features reaches 57.1\%.}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \footnotesize
+      After enough rounds of averaging with neighbors, \alert{each node in a
+      connected graph holds the same vector}. Li et al.\ (AAAI 2018) identified
+      this as over-smoothing.
+      \vspace{0.5em}
+
+      \begin{itemize}\setlength{\itemsep}{0.3em}
+        \item The cliff mixes over-smoothing with the difficulty of
+          \alert{deep GCN training} without residual connections.
+        \item On Cora, the optimum is \alert{2 layers}.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+\note{Backup. Numbers from the PyG node-classification tutorial on Cora
+(GCN, hidden=16, 5 runs averaged). The MLP baseline (57.1\%) uses the same
+node features without graph structure. The Colab link with our layer sweep
+is on the PyG tutorials slide.
+
+Li et al., ``Deeper Insights into Graph Convolutional Networks for
+Semi-Supervised Learning,'' AAAI 2018.}
 
 \end{document}
