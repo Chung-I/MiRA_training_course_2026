@@ -119,96 +119,8 @@ Do not define a graph yet. Show four robot pictures first.}
 an architecture. Do not take
 answers. There is no time.}
 
+
 % --- 4 ----------------------------------------------------------------
-\begin{frame}{Graph construction: k-NN, radius, or fully connected}
-  \vspace{-0.2em}
-  \begin{columns}[T]
-    \begin{column}{0.50\textwidth}
-      \centering
-      \begin{tikzpicture}[scale=0.66, every node/.style={transform shape},
-        pt/.style={circle, fill=acc2, minimum size=1.6mm, inner sep=0pt},
-        ee/.style={dim, line width=0.35pt}]
-        \begin{scope}
-          \node[pt] (p0) at (-0.10,1.85) {};  \node[pt] (p1) at (0.95,1.60) {};
-          \node[pt] (p2) at (1.70,0.80) {};   \node[pt] (p3) at (1.85,-0.30) {};
-          \node[pt] (p4) at (1.20,-1.35) {};  \node[pt] (p5) at (0.10,-1.80) {};
-          \node[pt] (p6) at (-1.05,-1.45) {}; \node[pt] (p7) at (-1.80,-0.55) {};
-          \node[pt] (p8) at (-1.85,0.55) {};  \node[pt] (p9) at (-1.05,1.55) {};
-          \node[pt] (p10) at (0.20,0.25) {};  \node[pt] (p11) at (-0.35,-0.15) {};
-          \node[pt] (p12) at (0.45,-0.35) {}; \node[pt] (p13) at (-0.05,-0.55) {};
-          \draw[ee] (p0)--(p1); \draw[ee] (p0)--(p9); \draw[ee] (p1)--(p2);
-          \draw[ee] (p2)--(p3); \draw[ee] (p3)--(p4); \draw[ee] (p4)--(p5);
-          \draw[ee] (p5)--(p6); \draw[ee] (p6)--(p7); \draw[ee] (p7)--(p8);
-          \draw[ee] (p8)--(p9); \draw[ee] (p10)--(p11); \draw[ee] (p10)--(p12);
-          \draw[ee] (p11)--(p13); \draw[ee] (p12)--(p13);
-          \node at (0,-2.5) {\small $k=3$: \emph{two disconnected pieces}};
-        \end{scope}
-        \begin{scope}[xshift=5.2cm]
-          \node[pt] (q0) at (-0.10,1.85) {};  \node[pt] (q1) at (0.95,1.60) {};
-          \node[pt] (q2) at (1.70,0.80) {};   \node[pt] (q3) at (1.85,-0.30) {};
-          \node[pt] (q4) at (1.20,-1.35) {};  \node[pt] (q5) at (0.10,-1.80) {};
-          \node[pt] (q6) at (-1.05,-1.45) {}; \node[pt] (q7) at (-1.80,-0.55) {};
-          \node[pt] (q8) at (-1.85,0.55) {};  \node[pt] (q9) at (-1.05,1.55) {};
-          \node[pt] (q10) at (0.20,0.25) {};  \node[pt] (q11) at (-0.35,-0.15) {};
-          \node[pt] (q12) at (0.45,-0.35) {}; \node[pt] (q13) at (-0.05,-0.55) {};
-          \draw[ee] (q0)--(q1); \draw[ee] (q0)--(q2); \draw[ee] (q0)--(q9);
-          \draw[ee] (q0)--(q10); \draw[ee] (q0)--(q11); \draw[ee] (q1)--(q2);
-          \draw[ee] (q1)--(q9); \draw[ee] (q1)--(q10); \draw[ee] (q1)--(q12);
-          \draw[ee] (q2)--(q3); \draw[ee] (q2)--(q10); \draw[ee] (q2)--(q12);
-          \draw[ee] (q3)--(q4); \draw[ee] (q3)--(q10); \draw[ee] (q3)--(q12);
-          \draw[ee] (q3)--(q13); \draw[ee] (q4)--(q5); \draw[ee] (q4)--(q10);
-          \draw[ee] (q4)--(q12); \draw[ee] (q4)--(q13); \draw[ee] (q5)--(q6);
-          \draw[ee] (q5)--(q11); \draw[ee] (q5)--(q12); \draw[ee] (q5)--(q13);
-          \draw[ee] (q6)--(q7); \draw[ee] (q6)--(q11); \draw[ee] (q6)--(q12);
-          \draw[ee] (q6)--(q13); \draw[ee] (q7)--(q8); \draw[ee] (q7)--(q10);
-          \draw[ee] (q7)--(q11); \draw[ee] (q7)--(q13); \draw[ee] (q8)--(q9);
-          \draw[ee] (q8)--(q10); \draw[ee] (q8)--(q11); \draw[ee] (q8)--(q13);
-          \draw[ee] (q9)--(q10); \draw[ee] (q9)--(q11); \draw[ee] (q10)--(q11);
-          \draw[ee] (q10)--(q12); \draw[ee] (q10)--(q13); \draw[ee] (q11)--(q12);
-          \draw[ee] (q11)--(q13); \draw[ee] (q12)--(q13);
-          \node at (0,-2.5) {\small $k=20$: \emph{structure thrown away}};
-        \end{scope}
-      \end{tikzpicture}
-    \end{column}
-    \begin{column}{0.46\textwidth}
-      \vspace{0.4em}
-      {\small The same 225 points, three different graphs:}
-      \vspace{0.4em}
-
-      \centering\small
-      \begin{tabular}{@{}rrr@{}}
-        \toprule
-        $k$ & edges & mean degree \\
-        \midrule
-        3  & 421  & 3.7 \\
-        8  & 1054 & 9.4 \\
-        20 & 2545 & 22.6 \\
-        \bottomrule
-      \end{tabular}
-
-      \vspace{0.5em}
-      \raggedright\small
-      The choice is k-NN, a radius, or fully connected, and then $k$.
-      \vspace{0.3em}
-
-      In robotics, the edge feature is the \alert{relative pose} of the
-      neighbor. A shift of the whole scene leaves every relative pose
-      unchanged, so the network is translation invariant by construction,
-      without shifted training examples.
-    \end{column}
-  \end{columns}
-\end{frame}
-\note{The k-NN numbers are from 225 random 2D points.
-
-Ask the room: which k is correct? There is no answer without the task. If k
-is too small, the object breaks into pieces. If k is too large, everything
-touches everything and the structure is lost.
-
-This slide saves them time. Say so.
-
-CHECKPOINT: 17:37 by the end of this slide.}
-
-% --- 5 ----------------------------------------------------------------
 \begin{frame}{What the nodes and edges were}
   \vspace{-0.5em}
   \centering
@@ -255,7 +167,7 @@ row closest to the projects in this room.
 
 Tell them that the slide is in the repo, so they do not photograph it.}
 
-% --- 6 ----------------------------------------------------------------
+% --- 5 ----------------------------------------------------------------
 \begin{frame}{In multi-robot systems, a ``message'' is a real radio message}
   \vspace{0.8em}
   \begin{center}\large
@@ -283,7 +195,7 @@ Use the promise from the GNS slide.}
 % Movement 2: The message-passing layer
 % =========================================================================
 
-% --- 7 ----------------------------------------------------------------
+% --- 6 ----------------------------------------------------------------
 \begin{frame}{One idea: each node makes a summary of its neighbors, then repeats}
   \vspace{-0.4em}
   \begin{center}
@@ -325,7 +237,7 @@ Use the promise from the GNS slide.}
 \note{Say the sentence before any notation appears. Do not rush this slide, and
 do not add symbols yet. If they remember one slide, make it this one.}
 
-% --- 8 ----------------------------------------------------------------
+% --- 7 ----------------------------------------------------------------
 \begin{frame}{The message-passing equation, in three clicks}
   \vspace{1.6em}
   \begin{center}
@@ -366,7 +278,7 @@ relative pose. That design decision is worth more than the architecture.
 
 CHECKPOINT: 17:32 by the end of this slide.}
 
-% --- 9 ----------------------------------------------------------------
+% --- 8 ----------------------------------------------------------------
 \begin{frame}{$L$ layers $=$ an $L$-hop receptive field}
   \vspace{0.2em}
   \begin{center}
@@ -419,7 +331,7 @@ grows one hop per layer.
 Most of the room already has the CNN receptive-field picture. Give them
 the mapping and stop.}
 
-% --- 10 ---------------------------------------------------------------
+% --- 9 ----------------------------------------------------------------
 \begin{frame}{GCN, GraphSAGE, GAT differ only in the AGG box}
   \vspace{0.6em}
   \begin{center}
@@ -453,7 +365,7 @@ Do not discuss expressiveness or the WL test. If someone asks, give one sentence
 % Failure modes and code
 % =========================================================================
 
-% --- 11 ---------------------------------------------------------------
+% --- 10 ---------------------------------------------------------------
 \begin{frame}{Deeper is worse: over-smoothing after 3 layers}
   \vspace{0.4em}
   \begin{columns}[T]
@@ -557,7 +469,7 @@ is the line the last twenty minutes were about.
 
 If someone asks about libraries: PyTorch Geometric. If you need heterogeneous graphs, use DGL.}
 
-% --- 12 ---------------------------------------------------------------
+% --- 11 ---------------------------------------------------------------
 \begin{frame}{PyTorch Geometric tutorials on Colab}
   \vspace{0.4em}
   \begin{center}\small
@@ -596,7 +508,7 @@ CHECKPOINT: back on slides by 17:44.}
 % Movement 3: GNNs and Transformers
 % =========================================================================
 
-% --- 13 ---------------------------------------------------------------
+% --- 12 ---------------------------------------------------------------
 \begin{frame}{What does a CNN assume? What does a Transformer assume?}
   \vspace{1.4em}
   \begin{columns}[T]
@@ -621,7 +533,7 @@ for the next 25 minutes.
 
 If nobody answers within five seconds, answer it yourself and move on.}
 
-% --- 14 ---------------------------------------------------------------
+% --- 13 ---------------------------------------------------------------
 \begin{frame}{Flattening fails: relabel the nodes and the answer changes}
   \vspace{0.4em}
   An MLP takes six objects on a table as one flattened vector.
@@ -648,7 +560,7 @@ If nobody answers within five seconds, answer it yourself and move on.}
 \note{The PyG Introduction tutorial shows this: renumber the nodes in a small
 graph and the MLP output changes, while the GCN output stays the same.}
 
-% --- 15 ---------------------------------------------------------------
+% --- 14 ---------------------------------------------------------------
 \begin{frame}{Flattening fails: the number of objects changes}
   \vspace{1.2em}
   \begin{center}
@@ -669,7 +581,7 @@ graph and the MLP output changes, while the GCN output stays the same.}
 \end{frame}
 \note{40 seconds. The audience already believes this one.}
 
-% --- 16 ---------------------------------------------------------------
+% --- 15 ---------------------------------------------------------------
 \begin{frame}{A Transformer is a GNN on the complete graph}
   \vspace{0.4em}
   \begin{center}
@@ -764,7 +676,7 @@ arXiv:2106.03672 (Amorpheus), arXiv:2408.16932 (PT v3).}
 % Close
 % =========================================================================
 
-% --- 17 ---------------------------------------------------------------
+% --- 16 ---------------------------------------------------------------
 \begin{frame}{When \emph{not} to use a GNN}
   \vspace{0.8em}
   \begin{itemize}
@@ -795,7 +707,7 @@ MeshGraphNets), and multi-robot coordination (Li \& Prorok) all held with
 GNNs. The field has converged on hybrids (GraphGPS), but T\"onshoff et al.\
 (LoG 2023) showed that tuned MPNNs close most of the reported gap.}
 
-% --- 18 ---------------------------------------------------------------
+% --- 17 ---------------------------------------------------------------
 \begin{frame}{When is a problem a graph?}
   \vspace{1.2em}
   \begin{enumerate}
@@ -814,7 +726,7 @@ problem is a graph.
 
 Give them five seconds of silence to test their own project against it.}
 
-% --- 19 ---------------------------------------------------------------
+% --- 18 ---------------------------------------------------------------
 \begin{frame}{Take-home}
   \vspace{0.2em}
   \begin{center}
@@ -846,7 +758,7 @@ Give them five seconds of silence to test their own project against it.}
 
 CHECKPOINT: 17:48. You promised 17:50. Finish early.}
 
-% --- 20 ---------------------------------------------------------------
+% --- 19 ---------------------------------------------------------------
 \begin{frame}[plain]
   \vspace{2.2em}
   \begin{center}
