@@ -127,6 +127,7 @@
 
 \begin{document}
 
+
 % =========================================================================
 \maketitle
 \note{\textbf{0:00.} Give your name and the promise: 40 minutes, and then you can size a
@@ -173,7 +174,11 @@ arrives in Movement 1.}
 
 
 % =========================================================================
-\section{The VRAM budget}
+
+% =========================================================================
+
+\section{VRAM and bandwidth}
+
 % =========================================================================
 
 \begin{frame}{VRAM usage: weights, KV cache, activations, overhead}
@@ -267,167 +272,6 @@ per user. 7 users fills a 24 GB card in fp16. In int4 the same 7 users leave
 13.1 GB free.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{Weight memory: parameters $\times$ bytes per parameter}
-  \llmdiagW
-  \begin{equation*}
-    \text{weight bytes} \;=\; \text{parameters} \times \text{bytes per parameter}
-  \end{equation*}
-  \begin{center}\small
-    fp32 $=4$ \quad fp16 / bf16 $=2$ \quad fp8 / int8 $=1$ \quad int4 $=0.5$
-  \end{center}
-  \vspace{0.4em}
-  \begin{center}
-    \begin{tabular}{lrrr}
-      \toprule
-      model & fp16 & int8 & int4 \\
-      \midrule
-      8B  &  16\,GB &  8\,GB & 4\,GB \\
-      \textbf{70B} & \warnc{140\,GB} & 70\,GB & \emphc{35\,GB} \\
-      405B & 810\,GB & 405\,GB & 203\,GB \\
-      \bottomrule
-    \end{tabular}
-  \end{center}
-  \vspace{0.5em}
-  \warnc{140\,GB} fits on no card you own.
-  \emphc{35\,GB} fits on one 40\,GB card, barely.
-  \textbf{That row decides the deployment architecture.}
-\end{frame}
-\note{\textbf{4:30.} Read the 70B row out loud. It is the cheapest useful
-calculation in machine learning, and most people skip it before they
-download.}
-
-% -------------------------------------------------------------------------
-\begin{frame}{The KV cache formula}
-  \llmdiagKV
-  \begin{equation*}
-    \underbrace{\text{KV bytes per token}}_{\text{per user, per token}}
-    \;=\;
-    \underbrace{2}_{\mathclap{\text{K and V}}}
-    \;\times\; \text{layers}
-    \;\times\; \text{kv\_heads}
-    \;\times\; \text{head\_dim}
-    \;\times\; \text{bytes per value}
-  \end{equation*}
-  \vspace{1.2em}
-  \begin{itemize}
-    \item Each token that you generated stays in memory.
-    \item It grows \emph{linearly} with conversation length.
-    \item You pay it \emph{once per concurrent user}.
-  \end{itemize}
-  \vspace{0.6em}
-  \emphc{layers, kv\_heads, head\_dim, bytes per value --- all in \texttt{config.json}.}
-\end{frame}
-\note{\textbf{5:30.} The one fact about attention I assume: decoding needs the keys
-and values of every previous token, so you keep them.}
-
-% -------------------------------------------------------------------------
-\begin{frame}{KV cache per token: Llama-3-8B worked example}
-  \llmdiagKV
-  \textbf{Llama-3-8B:} 32 layers, 8 KV heads, head\_dim 128, fp16 cache.
-  \vspace{0.6em}
-  \begin{align*}
-    \text{KV per token}
-      &= 2 \times 32 \times 8 \times 128 \times 2\ \text{bytes} \\[0.2em]
-    \uncover<2->{&= 131{,}072\ \text{bytes} \;=\; \emphc{128\ \text{KiB per token}}} \\[0.6em]
-    \uncover<3->{\text{An 8k conversation} &= 8192 \times 128\ \text{KiB}
-      \;=\; \warnc{1\ \text{GiB} \ \text{for one user}}}
-  \end{align*}
-  \vspace{0.4em}
-  \uncover<3->{You pay 16\,GB for the weights once. You pay this 1\,GiB again for
-  each person who opens a chat window.}
-\end{frame}
-\note{\textbf{6:30.} Do the multiplication aloud, slowly. The whole
-talk hangs on this slide. Pause after ``for one user''.}
-
-% -------------------------------------------------------------------------
-\begin{frame}{Grouped-Query Attention reduces KV cache by $4\times$}
-  \llmdiagKV
-  \begin{center}
-    \begin{tabular}{lrrr}
-      \toprule
-      model & KV heads & KV per token & 8k conversation \\
-      \midrule
-      Llama-2-7B \small(MHA) & 32 & \warnc{512\,KiB} & 4\,GiB \\
-      Llama-3-8B \small(GQA) &  8 & \emphc{128\,KiB} & 1\,GiB \\
-      \bottomrule
-    \end{tabular}
-  \end{center}
-  \vspace{1.0em}
-  \begin{center}\large
-    The \emph{smaller} model costs \warnc{four times more cache per token.}
-  \end{center}
-  \vspace{0.8em}
-  Only one thing changed. \emphc{Grouped-Query Attention} shares one set of
-  K/V across several query heads, so \texttt{kv\_heads} decreases from 32 to 8.
-  Same formula, one quarter of the memory.
-
-  \vspace{0.2em}
-  \begin{center}
-    \begin{tikzpicture}[font=\tiny,
-      hd/.style={circle, minimum size=4mm, inner sep=0pt, draw=black!50,
-                 font=\tiny\bfseries},
-      qh/.style={hd, fill=accent!20, draw=accent!60},
-      kh/.style={hd, fill=good!25, draw=good!60},
-      ar/.style={-{Latex[length=1mm]}, black!40}]
-    \node[font=\scriptsize\bfseries] at (0,1.4) {MHA};
-    \foreach \i in {0,...,3} {
-      \node[qh] (mq\i) at (\i*0.55-0.825, 0.8) {Q};
-      \node[kh] (mk\i) at (\i*0.55-0.825, 0.15) {KV};
-      \draw[ar] (mq\i)--(mk\i); }
-    \node[font=\scriptsize\bfseries] at (3.2,1.4) {GQA};
-    \foreach \i in {0,...,3}
-      \node[qh] (gq\i) at (\i*0.55+2.375, 0.8) {Q};
-    \node[kh] (gk0) at (2.65, 0.15) {KV};
-    \node[kh] (gk1) at (3.75, 0.15) {KV};
-    \draw[ar] (gq0)--(gk0); \draw[ar] (gq1)--(gk0);
-    \draw[ar] (gq2)--(gk1); \draw[ar] (gq3)--(gk1);
-    \node[font=\scriptsize\bfseries] at (6.4,1.4) {MQA};
-    \foreach \i in {0,...,3}
-      \node[qh] (aq\i) at (\i*0.55+5.575, 0.8) {Q};
-    \node[kh] (ak0) at (6.4, 0.15) {KV};
-    \foreach \i in {0,...,3} \draw[ar] (aq\i)--(ak0);
-    \end{tikzpicture}
-  \end{center}
-\end{frame}
-\note{\textbf{7:30.} Parameter count is a bad proxy for servability. If
-somebody asks ``is a 7B easier to serve than an 8B'', this is the answer:
-read \texttt{num\_key\_value\_heads}, not the name.
-
-Ainslie et al.\ uptrained T5-XXL from MHA to GQA-8 in 5\% of the original
-training steps. Inference was 5.4$\times$ faster (1.51\,s $\rightarrow$
-0.28\,s) with no measurable quality loss. arXiv:2305.13245.}
-
-
-% -------------------------------------------------------------------------
-\begin{frame}{Concurrent user capacity: VRAM minus weights, divided by KV per user}
-  \vspace{1.2em}
-  \llmdiagWKV
-  \begin{center}
-    \begin{minipage}{0.86\textwidth}
-      \begin{alertblock}{The consequence}
-        You divide the VRAM that remains \emph{after} the weights among the
-        concurrent users.
-
-        \vspace{0.4em}
-        The \textbf{KV cache} sets your \textbf{throughput}.
-      \end{alertblock}
-    \end{minipage}
-  \end{center}
-  \vspace{1.0em}
-  \begin{center}\large
-    $\text{users} \;\approx\;
-      \dfrac{\text{VRAM} - \text{weights} - \text{overhead}}
-            {\text{KV per token} \times \text{context length}}$
-  \end{center}
-\end{frame}
-\note{\textbf{8:30.} Say it twice. They must still have this sentence in a year.
-Each tool in the toolbox shrinks the weights term or the denominator.}
-
-
-% =========================================================================
-\section{Why decoding is slow}
-% =========================================================================
-
 \begin{frame}{Prefill is compute-bound. Decode is bandwidth-bound.}
   \llmdiagK
   \vspace{-0.2em}
@@ -542,36 +386,6 @@ arithmetic. The 9.4\% earns you Movement 3. \texttt{generate()} is a
 correctness reference.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{Batching: $15\times$ throughput at $4\%$ latency cost per user}
-  \llmdiagS
-  \hfill\demo{Part 8}
-  \vspace{0.2em}
-
-  The GPU reads the weights \emph{once for the whole batch}. So a bigger batch is
-  almost pure profit.
-  \begin{center}
-    \begin{tabular}{rrrr}
-      \toprule
-      batch & total tok/s & per-user tok/s & wall time \\
-      \midrule
-       1 &  169.3 & 169.3 & 0.39\,s \\
-      16 & \emphc{2594.6} & 162.2 & 0.39\,s \\
-      \bottomrule
-    \end{tabular}
-  \end{center}
-  \vspace{0.5em}
-  \begin{center}\small RTX 5090, Qwen2.5-0.5B, 64 new tokens.\end{center}
-  \vspace{0.4em}
-  \begin{itemize}
-    \item \textbf{Same wall-clock time.} You serve sixteen users instead of one.
-    \item \emphc{The KV cache capacity} limits the batch size.
-  \end{itemize}
-\end{frame}
-\note{\textbf{13:30.} Run this live too. It is the most persuasive number in the talk.
-Pause on the 0.39\,s column: the sixteenth user cost you nothing. Cache
-capacity is throughput.}
-
-% -------------------------------------------------------------------------
 \begin{frame}{Report TTFT, ITL and throughput together}
   \begin{center}
     \begin{tabular}{lll}
@@ -596,60 +410,183 @@ numbers, together, with the concurrency.
 End of Movement 2. Target: 18 minutes.}
 
 % =========================================================================
-\section{The toolbox, in order of payoff}
+
 % =========================================================================
 
-\begin{frame}{The toolbox, ranked by payoff}
-  \begin{enumerate}\small
-    \item \emphc{Use a real serving engine.} vLLM or SGLang.
-          One-line change, largest single payoff.
-    \item \emphc{Quantize the weights.} int4/int8/FP8. $\approx\frac14$ the VRAM,
-          several times the decode speed.
-    \item \emphc{Quantize the KV cache too.} fp8 or int8. This doubles
-          your user count. Few people use it.
-    \item \emphc{Cache the prefix.} Shared system prompt or retrieved
-          documents: prefill once, reuse.
-    \item Speculative decoding. 1.5--3$\times$, identical output distribution.
-    \item A smaller model, or one base $+$ many LoRA adapters.
-    \item More GPUs. \emph{Last.}
-  \end{enumerate}
+\section{Memory management}
+
+% =========================================================================
+
+% --- Weight quantization ---
+\begin{frame}{Weight memory: parameters $\times$ bytes per parameter}
+  \llmdiagW
+  \begin{equation*}
+    \text{weight bytes} \;=\; \text{parameters} \times \text{bytes per parameter}
+  \end{equation*}
+  \begin{center}\small
+    fp32 $=4$ \quad fp16 / bf16 $=2$ \quad fp8 / int8 $=1$ \quad int4 $=0.5$
+  \end{center}
+  \vspace{0.4em}
+  \begin{center}
+    \begin{tabular}{lrrr}
+      \toprule
+      model & fp16 & int8 & int4 \\
+      \midrule
+      8B  &  16\,GB &  8\,GB & 4\,GB \\
+      \textbf{70B} & \warnc{140\,GB} & 70\,GB & \emphc{35\,GB} \\
+      405B & 810\,GB & 405\,GB & 203\,GB \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  \vspace{0.5em}
+  \warnc{140\,GB} fits on no card you own.
+  \emphc{35\,GB} fits on one 40\,GB card, barely.
+  \textbf{That row decides the deployment architecture.}
 \end{frame}
-\note{\textbf{18:00.} If you are behind schedule, this frame alone carries
-items 5--7, and you skip their appendix slides. Say the order
-aloud. The order is the deliverable.}
+\note{\textbf{4:30.} Read the 70B row out loud. It is the cheapest useful
+calculation in machine learning, and most people skip it before they
+download.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{\#1 Serving engine: continuous batching and PagedAttention}
-  \llmdiagS
+\begin{frame}{\#2--3 Weight and KV cache quantization}
+  \llmdiagWKV
   \begin{columns}[T]
-    \begin{column}{0.48\textwidth}
-      \textbf{Continuous batching}\\[0.3em]
-      \small A finished request \emph{leaves the batch immediately}. It does
-      not wait for the slowest one in its group. New requests join on the
-      next step. There is no head-of-line blocking.
+    \begin{column}{0.49\textwidth}
+      \textbf{\#2 Weights}\\[0.3em]
+      \small
+      AWQ, GPTQ (post-training, weight-only). FP8 is native on Hopper and
+      newer. \emphc{NVFP4} on Blackwell halves FP8 further.\\[0.4em]
+      $\approx \frac14$ the VRAM at 4-bit, and several times the decode speed
+      because it moves fewer bytes.
     \end{column}
-    \begin{column}{0.48\textwidth}
-      \textbf{PagedAttention}\\[0.3em]
-      \small The KV cache in fixed-size \emph{pages}, like OS virtual memory.
-      Blocks need not be contiguous, and you stop reserving for the worst
-      case.
+    \begin{column}{0.49\textwidth}
+      \textbf{\#3 The KV cache}\\[0.3em]
+      \small
+      fp8 or int8 cache. This \emph{doubles} the number of users that you can
+      hold.\\[0.4em]
+      It follows from Movement 1, and few people enable it.
+      In our table it was 18 users $\rightarrow$ \emphc{36}.
     \end{column}
   \end{columns}
   \vspace{1.2em}
   \begin{center}
     \begin{minipage}{0.88\textwidth}
-      \begin{alertblock}{}
+      \begin{alertblock}{The rule}
         \centering
-        To replace \texttt{model.generate()} in a for-loop with
-        \texttt{vllm serve} is \emph{a one-line change}. It is the
-        largest single win available to you.
+        Quality loss is small on most tasks and large on some.\\
+        \textbf{Quantize, then re-run your own eval. A published perplexity
+        tells you little.}
       \end{alertblock}
     \end{minipage}
   \end{center}
 \end{frame}
-\note{\textbf{19:00.} They will want to write their own batching loop.
-Tell them plainly: you will get it wrong, and the people who got it correct
-gave it away.}
+\note{\textbf{21:30.} Name AWQ, GPTQ and FP8, give the rule, and continue.
+If someone asks which one, answer: the one that your engine supports for your
+card. The next slide has the details for the curious.}
+
+
+% -------------------------------------------------------------------------
+% --- KV cache ---
+\begin{frame}{The KV cache formula}
+  \llmdiagKV
+  \begin{equation*}
+    \underbrace{\text{KV bytes per token}}_{\text{per user, per token}}
+    \;=\;
+    \underbrace{2}_{\mathclap{\text{K and V}}}
+    \;\times\; \text{layers}
+    \;\times\; \text{kv\_heads}
+    \;\times\; \text{head\_dim}
+    \;\times\; \text{bytes per value}
+  \end{equation*}
+  \vspace{1.2em}
+  \begin{itemize}
+    \item Each token that you generated stays in memory.
+    \item It grows \emph{linearly} with conversation length.
+    \item You pay it \emph{once per concurrent user}.
+  \end{itemize}
+  \vspace{0.6em}
+  \emphc{layers, kv\_heads, head\_dim, bytes per value --- all in \texttt{config.json}.}
+\end{frame}
+\note{\textbf{5:30.} The one fact about attention I assume: decoding needs the keys
+and values of every previous token, so you keep them.}
+
+% -------------------------------------------------------------------------
+\begin{frame}{KV cache per token: Llama-3-8B worked example}
+  \llmdiagKV
+  \textbf{Llama-3-8B:} 32 layers, 8 KV heads, head\_dim 128, fp16 cache.
+  \vspace{0.6em}
+  \begin{align*}
+    \text{KV per token}
+      &= 2 \times 32 \times 8 \times 128 \times 2\ \text{bytes} \\[0.2em]
+    \uncover<2->{&= 131{,}072\ \text{bytes} \;=\; \emphc{128\ \text{KiB per token}}} \\[0.6em]
+    \uncover<3->{\text{An 8k conversation} &= 8192 \times 128\ \text{KiB}
+      \;=\; \warnc{1\ \text{GiB} \ \text{for one user}}}
+  \end{align*}
+  \vspace{0.4em}
+  \uncover<3->{You pay 16\,GB for the weights once. You pay this 1\,GiB again for
+  each person who opens a chat window.}
+\end{frame}
+\note{\textbf{6:30.} Do the multiplication aloud, slowly. The whole
+talk hangs on this slide. Pause after ``for one user''.}
+
+% -------------------------------------------------------------------------
+\begin{frame}{Grouped-Query Attention reduces KV cache by $4\times$}
+  \llmdiagKV
+  \begin{center}
+    \begin{tabular}{lrrr}
+      \toprule
+      model & KV heads & KV per token & 8k conversation \\
+      \midrule
+      Llama-2-7B \small(MHA) & 32 & \warnc{512\,KiB} & 4\,GiB \\
+      Llama-3-8B \small(GQA) &  8 & \emphc{128\,KiB} & 1\,GiB \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  \vspace{1.0em}
+  \begin{center}\large
+    The \emph{smaller} model costs \warnc{four times more cache per token.}
+  \end{center}
+  \vspace{0.8em}
+  Only one thing changed. \emphc{Grouped-Query Attention} shares one set of
+  K/V across several query heads, so \texttt{kv\_heads} decreases from 32 to 8.
+  Same formula, one quarter of the memory.
+
+  \vspace{0.2em}
+  \begin{center}
+    \begin{tikzpicture}[font=\tiny,
+      hd/.style={circle, minimum size=4mm, inner sep=0pt, draw=black!50,
+                 font=\tiny\bfseries},
+      qh/.style={hd, fill=accent!20, draw=accent!60},
+      kh/.style={hd, fill=good!25, draw=good!60},
+      ar/.style={-{Latex[length=1mm]}, black!40}]
+    \node[font=\scriptsize\bfseries] at (0,1.4) {MHA};
+    \foreach \i in {0,...,3} {
+      \node[qh] (mq\i) at (\i*0.55-0.825, 0.8) {Q};
+      \node[kh] (mk\i) at (\i*0.55-0.825, 0.15) {KV};
+      \draw[ar] (mq\i)--(mk\i); }
+    \node[font=\scriptsize\bfseries] at (3.2,1.4) {GQA};
+    \foreach \i in {0,...,3}
+      \node[qh] (gq\i) at (\i*0.55+2.375, 0.8) {Q};
+    \node[kh] (gk0) at (2.65, 0.15) {KV};
+    \node[kh] (gk1) at (3.75, 0.15) {KV};
+    \draw[ar] (gq0)--(gk0); \draw[ar] (gq1)--(gk0);
+    \draw[ar] (gq2)--(gk1); \draw[ar] (gq3)--(gk1);
+    \node[font=\scriptsize\bfseries] at (6.4,1.4) {MQA};
+    \foreach \i in {0,...,3}
+      \node[qh] (aq\i) at (\i*0.55+5.575, 0.8) {Q};
+    \node[kh] (ak0) at (6.4, 0.15) {KV};
+    \foreach \i in {0,...,3} \draw[ar] (aq\i)--(ak0);
+    \end{tikzpicture}
+  \end{center}
+\end{frame}
+\note{\textbf{7:30.} Parameter count is a bad proxy for servability. If
+somebody asks ``is a 7B easier to serve than an 8B'', this is the answer:
+read \texttt{num\_key\_value\_heads}, not the name.
+
+Ainslie et al.\ uptrained T5-XXL from MHA to GQA-8 in 5\% of the original
+training steps. Inference was 5.4$\times$ faster (1.51\,s $\rightarrow$
+0.28\,s) with no measurable quality loss. arXiv:2305.13245.}
+
 
 % -------------------------------------------------------------------------
 \begin{frame}{PagedAttention: the KV cache as virtual memory}
@@ -737,102 +674,6 @@ from ``the whole unused tail'' to ``at most one block''. Two requests
 with the same system prompt point at the same physical blocks.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{\#2--3 Weight and KV cache quantization}
-  \llmdiagWKV
-  \begin{columns}[T]
-    \begin{column}{0.49\textwidth}
-      \textbf{\#2 Weights}\\[0.3em]
-      \small
-      AWQ, GPTQ (post-training, weight-only). FP8 is native on Hopper and
-      newer. \emphc{NVFP4} on Blackwell halves FP8 further.\\[0.4em]
-      $\approx \frac14$ the VRAM at 4-bit, and several times the decode speed
-      because it moves fewer bytes.
-    \end{column}
-    \begin{column}{0.49\textwidth}
-      \textbf{\#3 The KV cache}\\[0.3em]
-      \small
-      fp8 or int8 cache. This \emph{doubles} the number of users that you can
-      hold.\\[0.4em]
-      It follows from Movement 1, and few people enable it.
-      In our table it was 18 users $\rightarrow$ \emphc{36}.
-    \end{column}
-  \end{columns}
-  \vspace{1.2em}
-  \begin{center}
-    \begin{minipage}{0.88\textwidth}
-      \begin{alertblock}{The rule}
-        \centering
-        Quality loss is small on most tasks and large on some.\\
-        \textbf{Quantize, then re-run your own eval. A published perplexity
-        tells you little.}
-      \end{alertblock}
-    \end{minipage}
-  \end{center}
-\end{frame}
-\note{\textbf{21:30.} Name AWQ, GPTQ and FP8, give the rule, and continue.
-If someone asks which one, answer: the one that your engine supports for your
-card. The next slide has the details for the curious.}
-
-
-% -------------------------------------------------------------------------
-\begin{frame}{\#4 Prefix caching: reuse KV blocks across requests}
-  \llmdiagKV
-  \begin{itemize}
-    \item Each request begins with the same 2000-token system prompt.
-    \item Each RAG request begins with the same retrieved documents.
-    \item \emphc{Prefill it once. Reuse the KV blocks for each later request.}
-  \end{itemize}
-  \vspace{1.0em}
-  \begin{center}
-    \begin{minipage}{0.88\textwidth}
-      \begin{block}{Why it is nearly free}
-        Those KV blocks already exist in memory. PagedAttention already
-        lets two requests point at the same physical block. PagedAttention makes prefix
-        caching possible, because two requests can share the same physical blocks.
-      \end{block}
-    \end{minipage}
-  \end{center}
-  \vspace{0.8em}
-  It costs a flag and changes no output. In a RAG deployment it is often
-  the largest latency win.
-\end{frame}
-\note{\textbf{22:30.} Example: an agent with a long tool-definition preamble
-pays for that preamble on each call, unless you cache it. It is the
-cheapest item in the toolbox.}
-
-% =========================================================================
-\section{The engines themselves}
-% =========================================================================
-
-\begin{frame}{vLLM: PagedAttention and continuous batching}
-  \llmdiagSKV
-  \begin{center}
-    \begin{minipage}{0.9\textwidth}
-      \begin{block}{Reported in the paper (arXiv:2309.06180)}
-        \centering
-        \textbf{2--4$\times$ throughput} $\cdot$
-        \textbf{1.7--2.7$\times$} the request rate of Orca $\cdot$
-        up to \textbf{22$\times$} FasterTransformer
-      \end{block}
-    \end{minipage}
-  \end{center}
-  \vspace{0.6em}
-  \textbf{The rest of the box}, all on by default or one flag away:
-  \begin{itemize}\small
-    \item \textbf{Continuous batching}: the V1 scheduler gives each request
-          a token budget and treats prompt and output tokens alike.
-    \item \textbf{Hash-based prefix caching}, \textbf{chunked prefill}
-          (on by default, decode prioritized), and \textbf{CUDA graphs}.
-    \item \textbf{Speculative decoding}: n-gram, suffix, EAGLE, MTP, draft model.
-    \item \textbf{Quantization}: FP8 / INT8 / INT4 / GPTQ / AWQ / NVFP4,
-          plus an \textbf{FP8 KV cache}.
-  \end{itemize}
-\end{frame}
-\note{\textbf{24:00.} They will remember one idea per project.
-vLLM = PagedAttention. Everything else on this slide is a bullet that they can
-find later. Do not read the list.}
-
-% -------------------------------------------------------------------------
 \begin{frame}{SGLang: RadixAttention for longest-prefix matching}
   \llmdiagKV
   \vspace{-0.6em}
@@ -893,99 +734,96 @@ misses this if the documents start at different block boundaries.}
 
 
 % -------------------------------------------------------------------------
-\begin{frame}{Measured throughput: HF, vLLM, SGLang on RTX 5090}
-  \small
-  Same RTX 5090, same Qwen2.5-0.5B in fp16, same 128 output tokens.
-  Total tok/s across all concurrent requests.
-  \vspace{0.4em}
-  \begin{center}
-    \begin{tabular}{rrrr}
-      \toprule
-      \textbf{batch} & \textbf{HF \texttt{generate()}} & \textbf{vLLM} &
-      \textbf{SGLang} \\
-      \midrule
-      1  & 165   & \textbf{726}    & 701 \\
-      8  & 1,275 & \textbf{5,155}  & 4,977 \\
-      16 & 2,548 & \textbf{9,880}  & 9,625 \\
-      64 & 9,782 & \textbf{37,265} & 32,523 \\
-      \bottomrule
-    \end{tabular}
-  \end{center}
-  \vspace{0.5em}
-  \begin{itemize}\small
-    \item \emphc{Batching does not explain it.} \texttt{generate()} batches correctly,
-          and all four scale almost linearly. The engines are
-          $\sim$4$\times$ faster \emph{per token}.
-    \item At batch 1, \texttt{generate()} reaches \textbf{9\%} of this model's
-          bandwidth ceiling. vLLM reaches \textbf{40\%}.
-    \item \textbf{On a 0.5\,B model, dispatch overhead dominates.}
+\begin{frame}{\#4 Prefix caching: reuse KV blocks across requests}
+  \llmdiagKV
+  \begin{itemize}
+    \item Each request begins with the same 2000-token system prompt.
+    \item Each RAG request begins with the same retrieved documents.
+    \item \emphc{Prefill it once. Reuse the KV blocks for each later request.}
   \end{itemize}
-\end{frame}
-\note{\textbf{29:00.} These are our own numbers, from two days ago. The 4$\times$ is the
-headline. Stop any "which is best" question fast: on a model this small you
-measure per-request overhead.}
-
-% -------------------------------------------------------------------------
-\begin{frame}{SGLang CUDA graph cliff: a default that halves throughput}
-  Same SGLang, same machine, one config value changed.
-  \vspace{0.4em}
+  \vspace{1.0em}
   \begin{center}
-    \begin{tabular}{rrr}
-      \toprule
-      \textbf{batch} & \textbf{stock config} & \textbf{graphs raised to 64} \\
-      \midrule
-      16 & 9,680 & 9,625 \\
-      32 & \warnc{5,657} & \goodc{18,491} \\
-      64 & \warnc{11,152} & \goodc{32,523} \\
-      \bottomrule
-    \end{tabular}
+    \begin{minipage}{0.88\textwidth}
+      \begin{block}{Why it is nearly free}
+        Those KV blocks already exist in memory. PagedAttention already
+        lets two requests point at the same physical block. PagedAttention makes prefix
+        caching possible, because two requests can share the same physical blocks.
+      \end{block}
+    \end{minipage}
   \end{center}
-  \vspace{0.6em}
-  SGLang captures decode CUDA graphs for
-  \texttt{bs = 1 2 4 8 12 16 24} and stops. Past 24 there is no graph, so it
-  uses eager mode. \texttt{cuda\_graph\_max\_bs\_decode} corrects it.
-  \vspace{0.5em}
+  \vspace{0.8em}
+  It costs a flag and changes no output. In a RAG deployment it is often
+  the largest latency win.
+\end{frame}
+\note{\textbf{22:30.} Example: an agent with a long tool-definition preamble
+pays for that preamble on each call, unless you cache it. It is the
+cheapest item in the toolbox.}
+
+% =========================================================================
+% --- Batching ---
+\begin{frame}{Concurrent user capacity: VRAM minus weights, divided by KV per user}
+  \vspace{1.2em}
+  \llmdiagWKV
   \begin{center}
-    \begin{minipage}{0.93\textwidth}
-      \begin{alertblock}{The lesson}
-        The missing CUDA toolkit showed a stack trace. This one
-        produced a \textbf{plausible and wrong} throughput curve.
-        \emphc{Benchmark at the concurrency that you will serve.}
+    \begin{minipage}{0.86\textwidth}
+      \begin{alertblock}{The consequence}
+        You divide the VRAM that remains \emph{after} the weights among the
+        concurrent users.
+
+        \vspace{0.4em}
+        The \textbf{KV cache} sets your \textbf{throughput}.
       \end{alertblock}
     \end{minipage}
   \end{center}
+  \vspace{1.0em}
+  \begin{center}\large
+    $\text{users} \;\approx\;
+      \dfrac{\text{VRAM} - \text{weights} - \text{overhead}}
+            {\text{KV per token} \times \text{context length}}$
+  \end{center}
 \end{frame}
-\note{\textbf{30:30.} If you measure only to 16, the
-default looks correct. If you measure only at 32 and 64, SGLang looks like the
-slow engine. Neither is true. A wrong number is more dangerous than a crash, because
-a crash stops you.}
+\note{\textbf{8:30.} Say it twice. They must still have this sentence in a year.
+Each tool in the toolbox shrinks the weights term or the denominator.}
 
-% -------------------------------------------------------------------------
-\begin{frame}{Engine selection: vLLM vs.\ SGLang}
-  \vspace{0.5em}
+
+% =========================================================================
+\begin{frame}{Batching: $15\times$ throughput at $4\%$ latency cost per user}
+  \llmdiagS
+  \hfill\demo{Part 8}
+  \vspace{0.2em}
+
+  The GPU reads the weights \emph{once for the whole batch}. So a bigger batch is
+  almost pure profit.
   \begin{center}
-    \begin{tabular}{ll}
+    \begin{tabular}{rrrr}
       \toprule
-      \textbf{vLLM} & the default. Start here. \\[0.5em]
-      \textbf{SGLang} & you live on \emph{shared prefixes} or \emph{structured
-                        output} \\
-                      & (agents, tool calling, JSON schemas). \\[0.5em]
+      batch & total tok/s & per-user tok/s & wall time \\
+      \midrule
+       1 &  169.3 & 169.3 & 0.39\,s \\
+      16 & \emphc{2594.6} & 162.2 & 0.39\,s \\
       \bottomrule
     \end{tabular}
   \end{center}
-  \vspace{1.2em}
-  \begin{center}\large
-  \end{center}
+  \vspace{0.5em}
+  \begin{center}\small RTX 5090, Qwen2.5-0.5B, 64 new tokens.\end{center}
+  \vspace{0.4em}
+  \begin{itemize}
+    \item \textbf{Same wall-clock time.} You serve sixteen users instead of one.
+    \item \emphc{The KV cache capacity} limits the batch size.
+  \end{itemize}
 \end{frame}
-\note{\textbf{28:00.} Be decisive. They came for a recommendation. End of Movement 3b.}
-
-% =========================================================================
-
-% =========================================================================
-\section{Acceleration techniques}
-% =========================================================================
+\note{\textbf{13:30.} Run this live too. It is the most persuasive number in the talk.
+Pause on the 0.39\,s column: the sixteenth user cost you nothing. Cache
+capacity is throughput.}
 
 % -------------------------------------------------------------------------
+
+% =========================================================================
+
+\section{Compute acceleration}
+
+% =========================================================================
+
 \begin{frame}{Kernel fusion: N HBM round-trips reduced to one}
   \llmdiagK
   \vspace{-0.4em}
@@ -1165,7 +1003,169 @@ bonus is speculative decoding with no separate draft model.
 DeepSeek-V3 technical report (arXiv:2412.19437). NVIDIA NeMo supports MTP via
 \texttt{mtp\_num\_layers} and \texttt{mtp\_loss\_scaling\_factor}.}
 
-\section{Serving robot policies is a different problem}
+\begin{frame}{SGLang CUDA graph cliff: a default that halves throughput}
+  Same SGLang, same machine, one config value changed.
+  \vspace{0.4em}
+  \begin{center}
+    \begin{tabular}{rrr}
+      \toprule
+      \textbf{batch} & \textbf{stock config} & \textbf{graphs raised to 64} \\
+      \midrule
+      16 & 9,680 & 9,625 \\
+      32 & \warnc{5,657} & \goodc{18,491} \\
+      64 & \warnc{11,152} & \goodc{32,523} \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  \vspace{0.6em}
+  SGLang captures decode CUDA graphs for
+  \texttt{bs = 1 2 4 8 12 16 24} and stops. Past 24 there is no graph, so it
+  uses eager mode. \texttt{cuda\_graph\_max\_bs\_decode} corrects it.
+  \vspace{0.5em}
+  \begin{center}
+    \begin{minipage}{0.93\textwidth}
+      \begin{alertblock}{The lesson}
+        The missing CUDA toolkit showed a stack trace. This one
+        produced a \textbf{plausible and wrong} throughput curve.
+        \emphc{Benchmark at the concurrency that you will serve.}
+      \end{alertblock}
+    \end{minipage}
+  \end{center}
+\end{frame}
+\note{\textbf{30:30.} If you measure only to 16, the
+default looks correct. If you measure only at 32 and 64, SGLang looks like the
+slow engine. Neither is true. A wrong number is more dangerous than a crash, because
+a crash stops you.}
+
+% -------------------------------------------------------------------------
+
+% =========================================================================
+
+\section{Engines and measurements}
+
+% =========================================================================
+
+\begin{frame}{\#1 Serving engine: continuous batching and PagedAttention}
+  \llmdiagS
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \textbf{Continuous batching}\\[0.3em]
+      \small A finished request \emph{leaves the batch immediately}. It does
+      not wait for the slowest one in its group. New requests join on the
+      next step. There is no head-of-line blocking.
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{PagedAttention}\\[0.3em]
+      \small The KV cache in fixed-size \emph{pages}, like OS virtual memory.
+      Blocks need not be contiguous, and you stop reserving for the worst
+      case.
+    \end{column}
+  \end{columns}
+  \vspace{1.2em}
+  \begin{center}
+    \begin{minipage}{0.88\textwidth}
+      \begin{alertblock}{}
+        \centering
+        To replace \texttt{model.generate()} in a for-loop with
+        \texttt{vllm serve} is \emph{a one-line change}. It is the
+        largest single win available to you.
+      \end{alertblock}
+    \end{minipage}
+  \end{center}
+\end{frame}
+\note{\textbf{19:00.} They will want to write their own batching loop.
+Tell them plainly: you will get it wrong, and the people who got it correct
+gave it away.}
+
+% -------------------------------------------------------------------------
+\begin{frame}{vLLM: PagedAttention and continuous batching}
+  \llmdiagSKV
+  \begin{center}
+    \begin{minipage}{0.9\textwidth}
+      \begin{block}{Reported in the paper (arXiv:2309.06180)}
+        \centering
+        \textbf{2--4$\times$ throughput} $\cdot$
+        \textbf{1.7--2.7$\times$} the request rate of Orca $\cdot$
+        up to \textbf{22$\times$} FasterTransformer
+      \end{block}
+    \end{minipage}
+  \end{center}
+  \vspace{0.6em}
+  \textbf{The rest of the box}, all on by default or one flag away:
+  \begin{itemize}\small
+    \item \textbf{Continuous batching}: the V1 scheduler gives each request
+          a token budget and treats prompt and output tokens alike.
+    \item \textbf{Hash-based prefix caching}, \textbf{chunked prefill}
+          (on by default, decode prioritized), and \textbf{CUDA graphs}.
+    \item \textbf{Speculative decoding}: n-gram, suffix, EAGLE, MTP, draft model.
+    \item \textbf{Quantization}: FP8 / INT8 / INT4 / GPTQ / AWQ / NVFP4,
+          plus an \textbf{FP8 KV cache}.
+  \end{itemize}
+\end{frame}
+\note{\textbf{24:00.} They will remember one idea per project.
+vLLM = PagedAttention. Everything else on this slide is a bullet that they can
+find later. Do not read the list.}
+
+% -------------------------------------------------------------------------
+\begin{frame}{Engine selection: vLLM vs.\ SGLang}
+  \vspace{0.5em}
+  \begin{center}
+    \begin{tabular}{ll}
+      \toprule
+      \textbf{vLLM} & the default. Start here. \\[0.5em]
+      \textbf{SGLang} & you live on \emph{shared prefixes} or \emph{structured
+                        output} \\
+                      & (agents, tool calling, JSON schemas). \\[0.5em]
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  \vspace{1.2em}
+  \begin{center}\large
+  \end{center}
+\end{frame}
+\note{\textbf{28:00.} Be decisive. They came for a recommendation. End of Movement 3b.}
+
+% =========================================================================
+
+% =========================================================================
+\begin{frame}{Measured throughput: HF, vLLM, SGLang on RTX 5090}
+  \small
+  Same RTX 5090, same Qwen2.5-0.5B in fp16, same 128 output tokens.
+  Total tok/s across all concurrent requests.
+  \vspace{0.4em}
+  \begin{center}
+    \begin{tabular}{rrrr}
+      \toprule
+      \textbf{batch} & \textbf{HF \texttt{generate()}} & \textbf{vLLM} &
+      \textbf{SGLang} \\
+      \midrule
+      1  & 165   & \textbf{726}    & 701 \\
+      8  & 1,275 & \textbf{5,155}  & 4,977 \\
+      16 & 2,548 & \textbf{9,880}  & 9,625 \\
+      64 & 9,782 & \textbf{37,265} & 32,523 \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  \vspace{0.5em}
+  \begin{itemize}\small
+    \item \emphc{Batching does not explain it.} \texttt{generate()} batches correctly,
+          and all four scale almost linearly. The engines are
+          $\sim$4$\times$ faster \emph{per token}.
+    \item At batch 1, \texttt{generate()} reaches \textbf{9\%} of this model's
+          bandwidth ceiling. vLLM reaches \textbf{40\%}.
+    \item \textbf{On a 0.5\,B model, dispatch overhead dominates.}
+  \end{itemize}
+\end{frame}
+\note{\textbf{29:00.} These are our own numbers, from two days ago. The 4$\times$ is the
+headline. Stop any "which is best" question fast: on a model this small you
+measure per-request overhead.}
+
+% -------------------------------------------------------------------------
+
+% =========================================================================
+
+\section{Robot policy serving}
+
 % =========================================================================
 
 \begin{frame}{Robot policy serving: batch 1, 20\,ms deadline}
@@ -1260,7 +1260,11 @@ CUDA graph replaces all of it with a single launch.}
 
 
 % =========================================================================
-\section{Deciding, and measuring}
+
+% =========================================================================
+
+\section{Deployment decisions}
+
 % =========================================================================
 
 \begin{frame}{Deployment decision tree: fit and speed}
@@ -1598,5 +1602,6 @@ the least likely to be necessary.}
 \end{frame}
 \note{Keep this open during questions. Someone will test the KV
 arithmetic, and that is good.}
+
 
 \end{document}
