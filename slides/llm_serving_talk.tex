@@ -63,50 +63,60 @@
         inner xsep=4pt, inner ysep=1.5pt, font=\bfseries\scriptsize] (x)
         {CUT #1};}
 
-% --- LLM mini-diagram: reusable, placed top-right on optimization slides --
-% Four separate commands highlight one or two parts each.
-% All draw the same 4-box diagram: Scheduler -> Weights -> Kernels, Scheduler -> KV Cache -> Kernels.
+% --- LLM mini-diagram: data-flow pipeline, anchored top-right via overlay --
+% Shows: Prefill -> KV -> Decode, with Weights feeding Prefill and Decode.
+% Each \llmdiagX command places the diagram at the top-right corner using
+% remember picture + overlay, so it floats above the slide content.
 \tikzset{
-  llmbox/.style={draw=black!30, fill=black!4, rounded corners=1.5pt,
-                 minimum height=0.36cm, inner xsep=2pt, inner ysep=1pt,
+  llmbox/.style={draw=black!30, fill=black!4, rounded corners=1pt,
+                 minimum height=0.28cm, inner xsep=1.5pt, inner ysep=0.5pt,
                  font=\sffamily\tiny},
-  llmhl/.style={draw=accent, fill=accent!18, line width=0.6pt},
-  llmar/.style={-{Latex[length=1mm]}, black!30},
+  llmhl/.style={draw=accent, fill=accent!18, line width=0.5pt},
+  llmar/.style={-{Latex[length=0.8mm]}, black!25},
 }
 \newcommand{\llmbase}{%
-  \node[llmbox, minimum width=1.3cm] (W) at (0, 0) {Weights};
-  \node[llmbox, minimum width=1.1cm] (KV) at (1.9, 0) {KV Cache};
-  \node[llmbox, minimum width=1.1cm] (S) at (0.95, 0.65) {Scheduler};
-  \node[llmbox, minimum width=0.9cm] (K) at (0.95, -0.65) {Kernels};
-  \draw[llmar] (S)--(W); \draw[llmar] (S)--(KV);
-  \draw[llmar] (W)--(K); \draw[llmar] (KV)--(K);
+  \node[llmbox] (PF) at (0, 0) {Prefill};
+  \node[llmbox] (KV) at (1.05, 0) {KV};
+  \node[llmbox] (DC) at (1.95, 0) {Decode};
+  \node[llmbox] (WP) at (0, -0.45) {Weights};
+  \node[llmbox] (WD) at (1.95, -0.45) {Weights};
+  \draw[llmar] (PF)--(KV); \draw[llmar] (KV)--(DC);
+  \draw[llmar] (WP)--(PF); \draw[llmar] (WD)--(DC);
 }
-% \llmdiagW highlights Weights
-\newcommand{\llmdiagW}{\begin{tikzpicture}[scale=0.8]\llmbase
-  \node[llmbox, llmhl, minimum width=1.3cm] at (0,0) {Weights};\end{tikzpicture}}
-% \llmdiagKV highlights KV Cache
-\newcommand{\llmdiagKV}{\begin{tikzpicture}[scale=0.8]\llmbase
-  \node[llmbox, llmhl, minimum width=1.1cm] at (1.9,0) {KV Cache};\end{tikzpicture}}
-% \llmdiagWKV highlights both
-\newcommand{\llmdiagWKV}{\begin{tikzpicture}[scale=0.8]\llmbase
-  \node[llmbox, llmhl, minimum width=1.3cm] at (0,0) {Weights};
-  \node[llmbox, llmhl, minimum width=1.1cm] at (1.9,0) {KV Cache};\end{tikzpicture}}
-% \llmdiagS highlights Scheduler
-\newcommand{\llmdiagS}{\begin{tikzpicture}[scale=0.8]\llmbase
-  \node[llmbox, llmhl, minimum width=1.1cm] at (0.95,0.65) {Scheduler};\end{tikzpicture}}
-% \llmdiagK highlights Kernels
-\newcommand{\llmdiagK}{\begin{tikzpicture}[scale=0.8]\llmbase
-  \node[llmbox, llmhl, minimum width=0.9cm] at (0.95,-0.65) {Kernels};\end{tikzpicture}}
-% \llmdiagSKV highlights Scheduler + KV Cache
-\newcommand{\llmdiagSKV}{\begin{tikzpicture}[scale=0.8]\llmbase
-  \node[llmbox, llmhl, minimum width=1.1cm] at (0.95,0.65) {Scheduler};
-  \node[llmbox, llmhl, minimum width=1.1cm] at (1.9,0) {KV Cache};\end{tikzpicture}}
-% \llmdiagAll highlights everything
-\newcommand{\llmdiagAll}{\begin{tikzpicture}[scale=0.8]\llmbase
-  \node[llmbox, llmhl, minimum width=1.3cm] at (0,0) {Weights};
-  \node[llmbox, llmhl, minimum width=1.1cm] at (1.9,0) {KV Cache};
-  \node[llmbox, llmhl, minimum width=1.1cm] at (0.95,0.65) {Scheduler};
-  \node[llmbox, llmhl, minimum width=0.9cm] at (0.95,-0.65) {Kernels};\end{tikzpicture}}
+% Helper: place a tikzpicture at top-right corner of the slide
+\newcommand{\llmoverlay}[1]{%
+  \begin{tikzpicture}[remember picture, overlay]
+    \node[anchor=north east, inner sep=0pt] at
+      ([xshift=-3mm, yshift=-1mm]current page.north east) {#1};
+  \end{tikzpicture}%
+}
+\newcommand{\llmdiagW}{\llmoverlay{\begin{tikzpicture}[scale=0.65]\llmbase
+  \node[llmbox, llmhl] at (0,-0.45) {Weights};
+  \node[llmbox, llmhl] at (1.95,-0.45) {Weights};\end{tikzpicture}}}
+\newcommand{\llmdiagKV}{\llmoverlay{\begin{tikzpicture}[scale=0.65]\llmbase
+  \node[llmbox, llmhl] at (1.05,0) {KV};\end{tikzpicture}}}
+\newcommand{\llmdiagWKV}{\llmoverlay{\begin{tikzpicture}[scale=0.65]\llmbase
+  \node[llmbox, llmhl] at (0,-0.45) {Weights};
+  \node[llmbox, llmhl] at (1.95,-0.45) {Weights};
+  \node[llmbox, llmhl] at (1.05,0) {KV};\end{tikzpicture}}}
+\newcommand{\llmdiagS}{\llmoverlay{\begin{tikzpicture}[scale=0.65]\llmbase
+  \node[llmbox, llmhl] at (0,0) {Prefill};
+  \node[llmbox, llmhl] at (1.95,0) {Decode};\end{tikzpicture}}}
+\newcommand{\llmdiagK}{\llmoverlay{\begin{tikzpicture}[scale=0.65]\llmbase
+  \node[llmbox, llmhl] at (0,0) {Prefill};
+  \node[llmbox, llmhl] at (1.95,0) {Decode};
+  \node[llmbox, llmhl] at (0,-0.45) {Weights};
+  \node[llmbox, llmhl] at (1.95,-0.45) {Weights};\end{tikzpicture}}}
+\newcommand{\llmdiagSKV}{\llmoverlay{\begin{tikzpicture}[scale=0.65]\llmbase
+  \node[llmbox, llmhl] at (0,0) {Prefill};
+  \node[llmbox, llmhl] at (1.95,0) {Decode};
+  \node[llmbox, llmhl] at (1.05,0) {KV};\end{tikzpicture}}}
+\newcommand{\llmdiagAll}{\llmoverlay{\begin{tikzpicture}[scale=0.65]\llmbase
+  \node[llmbox, llmhl] at (0,0) {Prefill};
+  \node[llmbox, llmhl] at (1.05,0) {KV};
+  \node[llmbox, llmhl] at (1.95,0) {Decode};
+  \node[llmbox, llmhl] at (0,-0.45) {Weights};
+  \node[llmbox, llmhl] at (1.95,-0.45) {Weights};\end{tikzpicture}}}
 
 % --- Speaker notes: uncomment to render -----------------------------------
 % \setbeameroption{show notes}
@@ -199,7 +209,7 @@ watch first and run it on the train home.}
 
 \begin{frame}{Four things occupy VRAM, and the KV cache is the one most people forget}
   \vspace{0.2em}
-  \hfill\llmdiagWKV
+  \llmdiagWKV
   \begin{columns}[c]
     \begin{column}{0.55\textwidth}
       \begin{center}
@@ -289,7 +299,7 @@ per user. 7 users fills a 24 GB card in fp16. In int4 the same 7 users leave
 
 % -------------------------------------------------------------------------
 \begin{frame}{Weights $=$ parameters $\times$ bytes. 70B in fp16 is 140\,GB.}
-  \hfill\llmdiagW
+  \llmdiagW
   \begin{equation*}
     \text{weight bytes} \;=\; \text{parameters} \times \text{bytes per parameter}
   \end{equation*}
@@ -319,7 +329,7 @@ download.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{The KV cache formula}
-  \hfill\llmdiagKV
+  \llmdiagKV
   \begin{equation*}
     \underbrace{\text{KV bytes per token}}_{\text{per user, per token}}
     \;=\;
@@ -343,7 +353,7 @@ and values of every previous token, so you keep them.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{Llama-3-8B: 128\,KiB per token, 1\,GiB per conversation}
-  \hfill\llmdiagKV
+  \llmdiagKV
   \textbf{Llama-3-8B:} 32 layers, 8 KV heads, head\_dim 128, fp16 cache.
   \vspace{0.6em}
   \begin{align*}
@@ -362,7 +372,7 @@ talk hangs on this slide. Pause after ``for one user''.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{GQA is why you can serve modern models}
-  \hfill\llmdiagKV
+  \llmdiagKV
   \begin{center}
     \begin{tabular}{lrrr}
       \toprule
@@ -389,7 +399,7 @@ read \texttt{num\_key\_value\_heads}, not the name.}
 % -------------------------------------------------------------------------
 \begin{frame}{GQA groups query heads to share fewer key-value pairs}
   \vspace{0.2em}
-  \hfill\llmdiagKV
+  \llmdiagKV
   \begin{center}
     \begin{tikzpicture}[
       font=\scriptsize,
@@ -454,7 +464,7 @@ arXiv:2305.13245.}
 % -------------------------------------------------------------------------
 \begin{frame}{Weights are a fixed cost. The KV cache is a per-user cost.}
   \vspace{1.2em}
-  \hfill\llmdiagWKV
+  \llmdiagWKV
   \begin{center}
     \begin{minipage}{0.86\textwidth}
       \begin{alertblock}{The consequence}
@@ -478,7 +488,7 @@ Each tool in the toolbox shrinks the weights term or the denominator.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{One 24\,GB card, one model: 7 users, or 36}
-  \hfill\llmdiagWKV
+  \llmdiagWKV
   \textbf{Llama-3-8B, 8k context per user, 24\,GB card, 2\,GB overhead.}
   \vspace{0.5em}
   \begin{center}
@@ -508,7 +518,7 @@ End of Movement 1. Target: 10 minutes.}
 % =========================================================================
 
 \begin{frame}{Prefill is compute-bound. Decode is bandwidth-bound.}
-  \hfill\llmdiagK
+  \llmdiagK
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
       \textbf{Prefill} (your prompt)\\[0.3em]
@@ -538,7 +548,7 @@ from Movement 2: ``decoding reads all the weights, once per token''.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{Your tokens/sec ceiling is bandwidth $\div$ bytes of weights}
-  \hfill\llmdiagW
+  \llmdiagW
   \begin{equation*}
     \text{tokens/sec} \;\leq\;
     \frac{\text{memory bandwidth}}{\text{bytes of weights read per token}}
@@ -561,7 +571,7 @@ is 4x cheaper.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{\texttt{generate()} reaches 9.4\% of the hardware}
-  \hfill\llmdiagAll
+  \llmdiagAll
   \hfill\demo{Part 6--7}
   \vspace{0.2em}
 
@@ -597,7 +607,7 @@ correctness reference.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{Batching is nearly free: 15$\times$ the throughput, 4\% slower per user}
-  \hfill\llmdiagS
+  \llmdiagS
   \hfill\demo{Part 8}
   \vspace{0.2em}
 
@@ -677,7 +687,7 @@ aloud. The order is the deliverable.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{\#1 A real engine, because two features do all the work}
-  \hfill\llmdiagS
+  \llmdiagS
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
       \textbf{Continuous batching}\\[0.3em]
@@ -710,7 +720,7 @@ gave it away.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{PagedAttention: the KV cache as virtual memory}
-  \hfill\llmdiagKV
+  \llmdiagKV
 \vspace{-0.2em}
 \begin{center}
 \begin{tikzpicture}[
@@ -795,7 +805,7 @@ with the same system prompt point at the same physical blocks.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{\#2--3 Quantize the weights, then quantize the cache}
-  \hfill\llmdiagWKV
+  \llmdiagWKV
   \begin{columns}[T]
     \begin{column}{0.49\textwidth}
       \textbf{\#2 Weights}\\[0.3em]
@@ -832,7 +842,7 @@ card. The next slide has the details for the curious.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{AWQ, GPTQ, NVFP4: three ways to shrink the weights}
-  \hfill\llmdiagW
+  \llmdiagW
   \vspace{-0.2em}
   \small
   \begin{itemize}\setlength{\itemsep}{0.6em}
@@ -863,7 +873,7 @@ arXiv:2210.17323 (GPTQ), arXiv:2306.00978 (AWQ).}
 
 % -------------------------------------------------------------------------
 \begin{frame}{\#4 Prefix caching is free, and it is the biggest RAG win}
-  \hfill\llmdiagKV
+  \llmdiagKV
   \begin{itemize}
     \item Each request begins with the same 2000-token system prompt.
     \item Each RAG request begins with the same retrieved documents.
@@ -892,7 +902,7 @@ cheapest item in the toolbox.}
 % =========================================================================
 
 \begin{frame}{vLLM is the default. Its trick is PagedAttention.}
-  \hfill\llmdiagSKV
+  \llmdiagSKV
   \begin{center}
     \begin{minipage}{0.9\textwidth}
       \begin{block}{Reported in the paper (arXiv:2309.06180)}
@@ -921,7 +931,7 @@ find later. Do not read the list.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{The SGLang trick is RadixAttention: longest-prefix match}
-  \hfill\llmdiagKV
+  \llmdiagKV
   \vspace{-0.6em}
   \begin{columns}[c]
     \begin{column}{0.48\textwidth}
@@ -980,7 +990,7 @@ misses this if the documents start at different block boundaries.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{The tree buys tiering, constrained decoding and PD split}
-  \hfill\llmdiagSKV
+  \llmdiagSKV
   \begin{itemize}
     \item \textbf{HiCache tiering.} L1 in GPU memory, L2 in host RAM, L3 in
           distributed storage. VRAM no longer bounds your cache.
@@ -1001,7 +1011,7 @@ them different machines. One sentence, then continue.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{The TensorRT-LLM trick is specialization to your exact hardware}
-  \hfill\llmdiagK
+  \llmdiagK
   The other two \emph{interpret} your model at run time. TensorRT-LLM can
   \emphc{compile an engine} first: kernels fused, each GEMM auto-tuned for your
   exact shapes and your exact GPU.
@@ -1184,7 +1194,7 @@ with different execution shapes, so the server schedules them separately.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{FlashRT: no compile, hand-written kernels, one CUDA graph}
-  \hfill\llmdiagK
+  \llmdiagK
   The opposite design point from TensorRT-LLM:
   \emphc{you run it without a compile step or an ONNX export}.
   \vspace{0.6em}
@@ -1526,7 +1536,7 @@ Source: NVIDIA developer blog, ``Introducing NVFP4''.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{\cutbadge{1: cut this first} \; Kernel fusion: why fused kernels are faster}
-  \hfill\llmdiagK
+  \llmdiagK
   \vspace{-0.4em}
   \begin{center}
     \begin{tikzpicture}[
@@ -1597,7 +1607,7 @@ claiming +20\% throughput and $-$60\% memory.}
 
 % -------------------------------------------------------------------------
 \begin{frame}{\cutbadge{2: trim next} \; \#5 Speculative decoding: 2$\times$, and the same output}
-  \hfill\llmdiagK
+  \llmdiagK
   \vspace{-0.4em}
   \begin{center}
     \begin{tikzpicture}[
