@@ -96,9 +96,13 @@ there is one equation and no spectral graph theory. Then stop early.
 
 Do not define a graph yet. Show four robot pictures first.}
 
+% --- 3 ----------------------------------------------------------------
+\begin{frame}{Outline}
+  \tableofcontents
+\end{frame}
 
 % =========================================================================
-% Movement 1: What GNNs are for, and how to build the graph
+\section{What GNNs are for}
 % =========================================================================
 
 % --- 3 ----------------------------------------------------------------
@@ -169,7 +173,7 @@ Tell them that the slide is in the repo, so they do not photograph it.}
 
 
 % =========================================================================
-% Movement 2: The message-passing layer
+\section{The message-passing layer}
 % =========================================================================
 
 % --- 5 ----------------------------------------------------------------
@@ -359,7 +363,7 @@ CHECKPOINT: back on slides by 17:44.}
 
 
 % =========================================================================
-% Movement 3: GNNs and Transformers
+\section{GNNs and Transformers}
 % =========================================================================
 
 % --- 9 ----------------------------------------------------------------
@@ -811,50 +815,55 @@ CHECKPOINT: 17:48. You promised 17:50. Finish early.}
 \appendix
 % =========================================================================
 
-\begin{frame}{Backup: over-smoothing after 3 layers (GCN on Cora)}
+\begin{frame}{Backup: why does accuracy collapse at 8 layers?}
+  \vspace{-0.2em}
+  \centering\scriptsize
+  \textbf{GCN on Cora}, hidden=16, 5 seeds. Train/test accuracy and mean
+  pairwise cosine distance between node embeddings.
   \vspace{0.2em}
-  \begin{columns}[c]
-    \begin{column}{0.48\textwidth}
-      \centering\small
-      \textbf{GCN on Cora} (2,708 nodes, 7 classes, hidden=16)
-      \vspace{0.3em}
 
-      \begin{tabular}{@{}rr@{}}
-        \toprule
-        layers & test accuracy \\
-        \midrule
-        1 & 75.1\% \\
-        \textbf{2} & \textcolor{good}{\textbf{80.7\%}} \\
-        3 & 78.0\% \\
-        4 & 76.8\% \\
-        6 & \textcolor{acc}{\textbf{74.4\%}} \\
-        8 & \textcolor{acc}{\textbf{61.6\%}} \\
-        \bottomrule
-      \end{tabular}
+  \begin{tabular}{@{}rrrrrr@{}}
+    \toprule
+    & \multicolumn{2}{c}{\textbf{baseline}} &
+      \multicolumn{2}{c}{\textbf{+\,residual}} & \\
+    \cmidrule(lr){2-3}\cmidrule(lr){4-5}
+    \textbf{layers} & train & test & train & test & \textbf{dist (base)} \\
+    \midrule
+    2 & 100.0 & \textcolor{good}{\textbf{80.8}} & 100.0 & 80.8 & 0.234 \\
+    4 & 100.0 & 77.6 & 100.0 & 79.7 & 0.266 \\
+    6 & 100.0 & 73.1 & 100.0 & \textcolor{good}{78.5} & 0.278 \\
+    8 & \textcolor{acc}{\textbf{82.4}} & \textcolor{acc}{\textbf{53.8}}
+      & 100.0 & 74.6 & 0.322 \\
+    \bottomrule
+  \end{tabular}
+  \vspace{0.4em}
 
-      \vspace{0.4em}
-      {\scriptsize From the node-classification notebook (5 seeds each).\\
-       An MLP on the same features reaches 54.7\%.}
+  \small
+  \begin{columns}[T]
+    \begin{column}{0.47\textwidth}
+      \textbf{2--6 layers:} all variants reach 100\% train accuracy.
+      The test accuracy drop (80.8\% $\rightarrow$ 73.1\%) comes from
+      \alert{over-smoothing}: embeddings become less discriminative, and the
+      model generalizes worse despite fitting the training set.
     \end{column}
-    \begin{column}{0.48\textwidth}
-      \footnotesize
-      After enough rounds of averaging with neighbors, \alert{each node in a
-      connected graph holds the same vector}. Li et al.\ (AAAI 2018) identified
-      this as over-smoothing.
-      \vspace{0.5em}
-
-      \begin{itemize}\setlength{\itemsep}{0.3em}
-        \item The cliff mixes over-smoothing with the difficulty of
-          \alert{deep GCN training} without residual connections.
-        \item On Cora, the optimum is \alert{2 layers}.
-      \end{itemize}
+    \begin{column}{0.47\textwidth}
+      \textbf{8 layers:} the baseline train accuracy drops to 88.1\%.
+      \alert{Residual connections} fix this to 100\%, confirming training
+      difficulty (vanishing gradients). But test accuracy still drops to
+      71.7\%, because over-smoothing degrades generalization even when
+      training succeeds.
     \end{column}
   \end{columns}
 \end{frame}
-\note{Backup. Numbers from \texttt{notebooks/pyg\_node\_classification.ipynb}
-(GCN on Cora, hidden=16, 5 seeds averaged). The MLP baseline (54.7\%) uses
-the same features without graph structure. Open the notebook in Colab to see
-the cached outputs and re-run.
+\note{Backup. The ablation is in Section 6 of
+\texttt{notebooks/pyg\_node\_classification.ipynb}. Open it in Colab to see
+the cached outputs.
+
+The key finding: residuals fix the training failure at 8 layers but do not
+fix the test accuracy loss. The model fits the data perfectly at every depth
+with residuals, but generalizes worse with more layers. Over-smoothing is the
+generalization bottleneck. Training difficulty is the training bottleneck.
+Both contribute, at different depths.
 
 Li et al., ``Deeper Insights into Graph Convolutional Networks for
 Semi-Supervised Learning,'' AAAI 2018.}
