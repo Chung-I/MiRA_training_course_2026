@@ -133,7 +133,7 @@
 deployment on paper. Inference only, no architecture. Say the end time: 11:00.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{``Put this model on our machine.'' Does it fit?}
+\begin{frame}{Deployment problem: one GPU, 70B parameters}
   \vspace{0.5em}
   \emphc{One GPU}. \emphc{70B parameters}.
   \begin{itemize}
@@ -204,7 +204,7 @@ watch first and run it on the train home.}
 \section{The VRAM budget}
 % =========================================================================
 
-\begin{frame}{Four things occupy VRAM, and the KV cache is the one most people forget}
+\begin{frame}{VRAM usage: weights, KV cache, activations, overhead}
   \vspace{0.2em}
   \llmdiagWKV
   \begin{columns}[c]
@@ -295,7 +295,7 @@ per user. 7 users fills a 24 GB card in fp16. In int4 the same 7 users leave
 13.1 GB free.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{Weights $=$ parameters $\times$ bytes. 70B in fp16 is 140\,GB.}
+\begin{frame}{Weight memory: parameters $\times$ bytes per parameter}
   \llmdiagW
   \begin{equation*}
     \text{weight bytes} \;=\; \text{parameters} \times \text{bytes per parameter}
@@ -349,7 +349,7 @@ download.}
 and values of every previous token, so you keep them.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{Llama-3-8B: 128\,KiB per token, 1\,GiB per conversation}
+\begin{frame}{KV cache per token: Llama-3-8B worked example}
   \llmdiagKV
   \textbf{Llama-3-8B:} 32 layers, 8 KV heads, head\_dim 128, fp16 cache.
   \vspace{0.6em}
@@ -368,7 +368,7 @@ and values of every previous token, so you keep them.}
 talk hangs on this slide. Pause after ``for one user''.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{GQA is why you can serve modern models}
+\begin{frame}{Grouped-Query Attention reduces KV cache by $4\times$}
   \llmdiagKV
   \begin{center}
     \begin{tabular}{lrrr}
@@ -459,7 +459,7 @@ matrices, then training for 5\% more steps.
 arXiv:2305.13245.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{Weights are a fixed cost. The KV cache is a per-user cost.}
+\begin{frame}{Concurrent user capacity: VRAM minus weights, divided by KV per user}
   \vspace{1.2em}
   \llmdiagWKV
   \begin{center}
@@ -483,32 +483,6 @@ arXiv:2305.13245.}
 \note{\textbf{8:30.} Say it twice. They must still have this sentence in a year.
 Each tool in the toolbox shrinks the weights term or the denominator.}
 
-% -------------------------------------------------------------------------
-\begin{frame}{One 24\,GB card, one model: 7 users, or 36}
-  \llmdiagWKV
-  \textbf{Llama-3-8B, 8k context per user, 24\,GB card, 2\,GB overhead.}
-  \vspace{0.5em}
-  \begin{center}
-    \begin{tabular}{llrrr}
-      \toprule
-      weights & KV cache & weights & free & \textbf{concurrent users} \\
-      \midrule
-      fp16 & fp16 & 14.9\,GB & 7.1\,GB & \warnc{7} \\
-      int4 & fp16 &  3.7\,GB & 18.3\,GB & 18 \\
-      int4 & fp8  &  3.7\,GB & 18.3\,GB & \emphc{36} \\
-      \bottomrule
-    \end{tabular}
-  \end{center}
-  \vspace{0.8em}
-  \begin{center}\large
-    \textbf{The same GPU and model serve \emphc{five times the users} after two
-    config changes: int4 weights and an fp8 cache.}
-  \end{center}
-\end{frame}
-\note{\textbf{9:30.} Notebook Part 3 prints this table for any card that you name.
-Cache quantization pays as much as weight quantization once the
-weights are small, and few people enable it.
-End of Movement 1. Target: 10 minutes.}
 
 % =========================================================================
 \section{Why decoding is slow}
@@ -544,7 +518,7 @@ End of Movement 1. Target: 10 minutes.}
 from Movement 2: ``decoding reads all the weights, once per token''.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{Your tokens/sec ceiling is bandwidth $\div$ bytes of weights}
+\begin{frame}{Decode throughput ceiling: memory bandwidth $\div$ weight bytes}
   \llmdiagW
   \begin{equation*}
     \text{tokens/sec} \;\leq\;
@@ -567,7 +541,7 @@ folklore here. int4 arithmetic costs about the same. int4 \emph{traffic}
 is 4x cheaper.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{\texttt{generate()} reaches 9.4\% of the hardware}
+\begin{frame}{Measured efficiency: \texttt{generate()} at 9.4\% of bandwidth ceiling}
   \llmdiagAll
   \hfill\demo{Part 6--7}
   \vspace{0.2em}
@@ -603,7 +577,7 @@ arithmetic. The 9.4\% earns you Movement 3. \texttt{generate()} is a
 correctness reference.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{Batching is nearly free: 15$\times$ the throughput, 4\% slower per user}
+\begin{frame}{Batching: $15\times$ throughput at $4\%$ latency cost per user}
   \llmdiagS
   \hfill\demo{Part 8}
   \vspace{0.2em}
@@ -680,7 +654,7 @@ items 5--7, and you skip their appendix slides. Say the order
 aloud. The order is the deliverable.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{\#1 A real engine, because two features do all the work}
+\begin{frame}{\#1 Serving engine: continuous batching and PagedAttention}
   \llmdiagS
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
@@ -798,7 +772,7 @@ from ``the whole unused tail'' to ``at most one block''. Two requests
 with the same system prompt point at the same physical blocks.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{\#2--3 Quantize the weights, then quantize the cache}
+\begin{frame}{\#2--3 Weight and KV cache quantization}
   \llmdiagWKV
   \begin{columns}[T]
     \begin{column}{0.49\textwidth}
@@ -866,7 +840,7 @@ hardware-native 4-bit float format with fine-grained block scaling.
 arXiv:2210.17323 (GPTQ), arXiv:2306.00978 (AWQ).}
 
 % -------------------------------------------------------------------------
-\begin{frame}{\#4 Prefix caching is free, and it is the biggest RAG win}
+\begin{frame}{\#4 Prefix caching: reuse KV blocks across requests}
   \llmdiagKV
   \begin{itemize}
     \item Each request begins with the same 2000-token system prompt.
@@ -895,7 +869,7 @@ cheapest item in the toolbox.}
 \section{The engines themselves}
 % =========================================================================
 
-\begin{frame}{vLLM is the default. Its trick is PagedAttention.}
+\begin{frame}{vLLM: PagedAttention and continuous batching}
   \llmdiagSKV
   \begin{center}
     \begin{minipage}{0.9\textwidth}
@@ -924,7 +898,7 @@ vLLM = PagedAttention. Everything else on this slide is a bullet that they can
 find later. Do not read the list.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{The SGLang trick is RadixAttention: longest-prefix match}
+\begin{frame}{SGLang: RadixAttention for longest-prefix matching}
   \llmdiagKV
   \vspace{-0.6em}
   \begin{columns}[c]
@@ -983,7 +957,7 @@ different documents share the same system-prompt KV pages. A hash-based cache
 misses this if the documents start at different block boundaries.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{The tree buys tiering, constrained decoding and PD split}
+\begin{frame}{SGLang: cache tiering, constrained decoding, prefill/decode split}
   \llmdiagSKV
   \begin{itemize}
     \item \textbf{HiCache tiering.} L1 in GPU memory, L2 in host RAM, L3 in
@@ -1004,7 +978,7 @@ of Movement 2: prefill is compute-bound, decode is bandwidth-bound, so give
 them different machines. One sentence, then continue.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{The TensorRT-LLM trick is specialization to your exact hardware}
+\begin{frame}{TensorRT-LLM: compile-time specialization per model and GPU}
   \llmdiagK
   The other two \emph{interpret} your model at run time. TensorRT-LLM can
   \emphc{compile an engine} first: kernels fused, each GEMM auto-tuned for your
@@ -1039,7 +1013,7 @@ tested it: 1.2.1 starts a PyTorch runtime by default. Most blog posts still
 repeat the older description, and it is out of date.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{We measured all three. An engine is worth about 4$\times$.}
+\begin{frame}{Measured throughput: HF, vLLM, SGLang, TRT-LLM on RTX 5090}
   \small
   Same RTX 5090, same Qwen2.5-0.5B in fp16, same 128 output tokens.
   Total tok/s across all concurrent requests.
@@ -1073,7 +1047,7 @@ headline. Stop any "which is best" question fast: on a model this small you
 measure per-request overhead.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{The default that costs you half your throughput}
+\begin{frame}{SGLang CUDA graph cliff: a configuration that halves throughput}
   Same SGLang, same machine, one config value changed.
   \vspace{0.4em}
   \begin{center}
@@ -1108,7 +1082,7 @@ slow engine. Neither is true. A wrong number is more dangerous than a crash, bec
 a crash stops you.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{vLLM is the default. SGLang and TRT-LLM solve different problems.}
+\begin{frame}{Engine selection: vLLM, SGLang, TensorRT-LLM}
   \vspace{0.5em}
   \begin{center}
     \begin{tabular}{ll}
@@ -1137,7 +1111,7 @@ a crash stops you.}
 % =========================================================================
 
 % -------------------------------------------------------------------------
-\begin{frame}{Kernel fusion: why fused kernels are faster}
+\begin{frame}{Kernel fusion: N HBM round-trips reduced to one}
   \llmdiagK
   \vspace{-0.4em}
   \begin{center}
@@ -1208,7 +1182,7 @@ Liger-Kernel applies the same technique to training (fused RMSNorm + SwiGLU),
 claiming +20\% throughput and $-$60\% memory.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{\#5 Speculative decoding: 2$\times$, and the same output}
+\begin{frame}{\#5 Speculative decoding: draft, verify, accept}
   \llmdiagK
   \vspace{-0.4em}
   \begin{center}
@@ -1279,7 +1253,7 @@ probability $p_\text{target}/p_\text{draft}$ and sample a correction from
 the residual. Leviathan et al., arXiv:2302.01318.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{Multi-Token Prediction trains the draft head into the model}
+\begin{frame}{Multi-Token Prediction: a built-in draft for speculative decoding}
   \textbf{MTP} trains a model to predict $D$ tokens ahead. At inference
   the extra heads serve as a \emph{built-in draft} for speculative decoding,
   so no separate draft model is needed.
@@ -1319,7 +1293,7 @@ DeepSeek-V3 technical report (arXiv:2412.19437). NVIDIA NeMo supports MTP via
 \section{Serving robot policies is a different problem}
 % =========================================================================
 
-\begin{frame}{A robot policy wants a deadline}
+\begin{frame}{Robot policy serving: batch 1, 20\,ms deadline}
   \vspace{0.3em}
   \begin{center}
     \begin{tabular}{lll}
@@ -1397,7 +1371,7 @@ few hundred kernels takes a large fraction of the frame. One
 CUDA graph replaces all of it with a single launch.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{714\,ms $\rightarrow$ 44\,ms with the same weights}
+\begin{frame}{FlashRT latency: 714\,ms to 44\,ms on the same model}
   \begin{center}\small
     \begin{tabular}{llrl}
       \toprule
@@ -1435,7 +1409,7 @@ Target: 32 minutes.}
 \section{Deciding, and measuring}
 % =========================================================================
 
-\begin{frame}{Two questions decide the deployment}
+\begin{frame}{Deployment decision tree: fit and speed}
 \vspace{0.9em}
 \begin{center}
 \begin{tikzpicture}[
@@ -1483,7 +1457,7 @@ Target: 32 minutes.}
 a flag was sufficient.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{Dollars per million tokens, and when to use an API}
+\begin{frame}{Cost per million tokens: self-hosting vs.\ API}
   \begin{equation*}
     \text{\$ per 1M tokens}
       \;=\;
@@ -1517,7 +1491,7 @@ Give them the sentence that they can say to a PI: ``at our utilization this
 costs X per million tokens, and the API costs Y''.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{How to benchmark and get a true number}
+\begin{frame}{Benchmarking: five rules for reproducible measurements}
   \begin{enumerate}
     \item \textbf{Warm up first.} The first request pays for CUDA graph
           capture, allocator growth and JIT.
@@ -1561,7 +1535,7 @@ your arithmetic.}
 seconds and let them take it. Then give the take-home.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{The model you can serve beats the model you cannot}
+\begin{frame}{Deployment sizing is arithmetic on two numbers}
   \vspace{1.4em}
   \begin{center}
     \begin{minipage}{0.9\textwidth}

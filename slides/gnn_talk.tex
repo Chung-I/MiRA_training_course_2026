@@ -81,7 +81,7 @@ Skip the warm-up. Target: finish at 17:48.
 CHECKPOINT: 17:20 here.}
 
 % --- 2 ----------------------------------------------------------------
-\begin{frame}{Three ideas about graph neural networks}
+\begin{frame}{Three properties of graph neural networks}
   \begin{enumerate}
     \setlength{\itemsep}{1.1em}
     \item Each node makes a \alert{summary of its neighbors}, then updates itself.
@@ -177,7 +177,7 @@ Tell them that the slide is in the repo, so they do not photograph it.}
 % =========================================================================
 
 % --- 5 ----------------------------------------------------------------
-\begin{frame}{One idea: each node makes a summary of its neighbors, then repeats}
+\begin{frame}{Message passing: aggregate neighbors, update, repeat}
   \vspace{-0.4em}
   \begin{center}
     \begin{tikzpicture}[scale=0.92, every node/.style={transform shape},
@@ -219,7 +219,7 @@ Tell them that the slide is in the repo, so they do not photograph it.}
 do not add symbols yet. If they remember one slide, make it this one.}
 
 % --- 6 ----------------------------------------------------------------
-\begin{frame}{The message-passing equation, in three clicks}
+\begin{frame}{The message-passing equation: MSG, AGG, UPDATE}
   \vspace{1.6em}
   \begin{center}
     \large
@@ -367,7 +367,7 @@ CHECKPOINT: back on slides by 17:44.}
 % =========================================================================
 
 % --- 9 ----------------------------------------------------------------
-\begin{frame}{CNN, Transformer, GNN: three assumptions about structure}
+\begin{frame}{CNN, Transformer, GNN: three structural assumptions}
   \vspace{0.2em}
   \begin{center}
     \begin{tikzpicture}[
@@ -612,7 +612,7 @@ GAT is the sparse case. The FFN, residual, and LayerNorm are non-graph parts.
 CHECKPOINT: 17:28 by the end of this slide. Movement 3 starts now.}
 
 % -------------------------------------------------------------------------
-\begin{frame}{When the known graph wins, and when it does not}
+\begin{frame}{Sparse known graph vs.\ learned attention: a decision rule}
   \vspace{0.1em}
   \begin{center}
     \begin{tikzpicture}[
@@ -688,7 +688,7 @@ when the graph is an artifact or data is abundant.}
 % =========================================================================
 
 % --- 13 ---------------------------------------------------------------
-\begin{frame}{When \emph{not} to use a GNN}
+\begin{frame}{When a Transformer outperforms a GNN}
   \vspace{0.6em}
   \begin{itemize}
     \setlength{\itemsep}{0.6em}
@@ -717,7 +717,7 @@ GNNs. The field has converged on hybrids (GraphGPS), but T\"onshoff et al.\
 (LoG 2023) showed that tuned MPNNs close most of the reported gap.}
 
 % --- 14 ---------------------------------------------------------------
-\begin{frame}{When is a problem a graph?}
+\begin{frame}{Three-question test for graph-structured problems}
   \vspace{1.2em}
   \begin{enumerate}
     \setlength{\itemsep}{1.3em}
@@ -815,7 +815,7 @@ CHECKPOINT: 17:48. You promised 17:50. Finish early.}
 \appendix
 % =========================================================================
 
-\begin{frame}{Backup: why does accuracy collapse at 8 layers?}
+\begin{frame}{Backup: over-smoothing vs.\ training difficulty on Cora}
   \vspace{-0.2em}
   \centering\scriptsize
   \textbf{GCN on Cora}, hidden=16, 5 seeds. Train/test accuracy and mean
